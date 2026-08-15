@@ -6,6 +6,7 @@ import logging
 from datetime import timedelta
 from typing import Any
 
+import aiohttp
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -39,7 +40,18 @@ from .const import (
 )
 from pymodbus.exceptions import ModbusException
 
+from .cloud_client import AtmoceCloudClient, AtmoceCloudError
 from .modbus_client import AtmoceModbusClient
+
+# Everything that can go wrong reaching the Cloud Open API. The fallback is
+# best-effort, so these degrade to UpdateFailed rather than propagating.
+CLOUD_FETCH_ERRORS = (
+    AtmoceCloudError,
+    aiohttp.ClientError,
+    ConnectionError,
+    OSError,
+    asyncio.TimeoutError,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -98,7 +110,7 @@ class AtmoceCoordinator(DataUpdateCoordinator):
         self._web_client: Any = None     # web-portal private API (SOC limits)
         self._station_id: int | None = None
         # SOC limits, kept across Modbus polls (Modbus can't provide them)
-        self._cloud_params: dict[str, Any] = {}
+        self._web_params: dict[str, Any] = {}
 
         # State tracking
         self._modbus_failures: int = 0
@@ -157,7 +169,7 @@ class AtmoceCoordinator(DataUpdateCoordinator):
                 raw = await self._fetch_cloud()
                 self._active_source = SOURCE_CLOUD
                 _LOGGER.info("Using Cloud API as data source (Modbus unavailable)")
-            except (ConnectionError, OSError, asyncio.TimeoutError) as exc:
+            except CLOUD_FETCH_ERRORS as exc:
                 _LOGGER.error("Cloud fallback also failed: %s", exc)
 
         if raw is None:
@@ -168,8 +180,8 @@ class AtmoceCoordinator(DataUpdateCoordinator):
         raw["connection_errors"] = self._connection_errors
         raw = self._compute_derived(raw)
 
-        # Re-inject Cloud-only SOC limits (Modbus polls never carry these keys).
-        raw.update(self._cloud_params)
+        # Re-inject the web-portal SOC limits (Modbus polls never carry these keys).
+        raw.update(self._web_params)
 
         return raw
 
@@ -194,9 +206,6 @@ class AtmoceCoordinator(DataUpdateCoordinator):
     def _get_cloud_client(self) -> Any:
         """Return a persistent Cloud client, creating it on first use."""
         if self._cloud_client is None:
-            # Lazy import to avoid the dependency when Cloud is disabled
-            from .cloud_client import AtmoceCloudClient  # noqa: PLC0415
-
             self._cloud_client = AtmoceCloudClient(
                 self._cloud_app_key, self._cloud_app_secret
             )
@@ -299,7 +308,7 @@ class AtmoceCoordinator(DataUpdateCoordinator):
             )
         return self._station_id
 
-    async def async_load_cloud_soc_limits(self) -> None:
+    async def async_load_web_soc_limits(self) -> None:
         """Read the battery SOC limits from the web portal and cache them.
 
         Best-effort: called once at setup (and after a write). Failures are logged
@@ -318,17 +327,17 @@ class AtmoceCoordinator(DataUpdateCoordinator):
             raw = model.get(field)
             if raw is not None and raw != "":
                 try:
-                    self._cloud_params[key] = int(float(raw))
+                    self._web_params[key] = int(float(raw))
                 except (TypeError, ValueError):
-                    self._cloud_params[key] = raw
+                    self._web_params[key] = raw
 
-        _LOGGER.debug("Loaded battery SOC limits: %s", self._cloud_params)
+        _LOGGER.debug("Loaded battery SOC limits: %s", self._web_params)
 
         # Push the cached limits to entities without triggering a Modbus poll.
         if self.data is not None:
-            self.async_set_updated_data({**self.data, **self._cloud_params})
+            self.async_set_updated_data({**self.data, **self._web_params})
 
-    async def async_set_cloud_soc_limit(self, key: str, value: int) -> None:
+    async def async_set_web_soc_limit(self, key: str, value: int) -> None:
         """Write a battery SOC limit via the web portal (read-modify-write).
 
         Requires the web-portal login (email + password). Updates the cached value
@@ -336,7 +345,7 @@ class AtmoceCoordinator(DataUpdateCoordinator):
         """
         if not self.soc_control_available:
             raise HomeAssistantError(
-                "This setting needs your Atmoce Cloud login (email + password) "
+                "This setting needs your atmocecloud.com login (email + password) "
                 "configured in the integration options (Configure)."
             )
         field = _SOC_WEB_FIELDS[key]
@@ -344,9 +353,9 @@ class AtmoceCoordinator(DataUpdateCoordinator):
             station_id = await self._async_station_id()
             await self._get_web_client().async_change_model(station_id, {field: int(value)})
         except Exception as exc:  # noqa: BLE001 — surfaced to the user below
-            raise HomeAssistantError(f"Cloud write failed for {key}: {exc}") from exc
+            raise HomeAssistantError(f"Portal write failed for {key}: {exc}") from exc
 
         # Optimistic update; the next load reconciles with the portal.
-        self._cloud_params[key] = int(value)
+        self._web_params[key] = int(value)
         if self.data is not None:
-            self.async_set_updated_data({**self.data, **self._cloud_params})
+            self.async_set_updated_data({**self.data, **self._web_params})
