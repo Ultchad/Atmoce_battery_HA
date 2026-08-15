@@ -136,6 +136,15 @@ CONF_RETRY_COUNT      = "modbus_retry_count"
 DEFAULT_BATTERY_COUNT = 1
 MAX_BATTERY_COUNT     = 16
 
+# The only battery Atmoce actually ships as a unit. MS-14K-U is two of these in
+# one box, so setup asks for a count instead of a model. The catalogue keeps
+# both: entries created before the count existed still carry "MS-14K-U", and
+# that string is the device model shown in Home Assistant.
+UNIT_BATTERY_MODEL = "MS-7K-U"
+
+# Routing flag on the battery step — never stored in the config entry.
+CONF_MANUAL_SPECS = "manual_specs"
+
 # Credentials live in entry.data only. The options flow edits them in place there
 # instead of writing a second copy into entry.options, so a secret is never
 # persisted twice on disk.

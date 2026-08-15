@@ -14,14 +14,15 @@
         }
       },
       "battery": {
-        "title": "Modèle de batterie",
-        "description": "Sélectionnez votre modèle de batterie et le nombre d'unités installées. Cela détermine la capacité utile et les limites de puissance.",
+        "title": "Batteries",
+        "description": "Combien de batteries Atmoce MS-7K-U sont installées ? Atmoce ne commercialise qu'une seule unité de 7 kWh : le nombre suffit donc à déterminer la capacité utile et les limites de puissance. Une MS-14K-U correspond à deux de ces unités.",
         "data": {
-          "battery_model": "Modèle",
-          "battery_count": "Nombre de batteries"
+          "battery_count": "Nombre de batteries",
+          "manual_specs": "Saisir les spécifications manuellement"
         },
         "data_description": {
-          "battery_count": "Unités empilées du même modèle. La capacité et la puissance sont multipliées par ce nombre. Si votre onduleur plafonne la puissance totale en dessous, choisissez plutôt les spécifications manuelles et saisissez les totaux réels."
+          "battery_count": "Chaque unité ajoute 7 kWh, 3,75 kW de charge et 4,5 kW de décharge.",
+          "manual_specs": "Cochez cette case pour un autre matériel, ou si votre onduleur plafonne la puissance totale en dessous de la somme des unités."
         }
       },
       "manual_battery": {
@@ -72,11 +73,10 @@
         "title": "Batteries installées",
         "description": "À utiliser après avoir ajouté ou retiré une batterie. La capacité et les limites de puissance sont définies une seule fois lors de la configuration et alimentent le capteur d'autonomie ainsi que les curseurs de puissance forcée : il faut donc les mettre à jour quand le nombre d'unités change.\n\nRien d'autre n'est modifié : la passerelle, les identifiants et l'historique des entités restent intacts.",
         "data": {
-          "battery_model": "Modèle",
           "battery_count": "Nombre de batteries"
         },
         "data_description": {
-          "battery_count": "Unités empilées du même modèle. La capacité et la puissance sont multipliées par ce nombre."
+          "battery_count": "Chaque unité MS-7K-U ajoute 7 kWh, 3,75 kW de charge et 4,5 kW de décharge. Une MS-14K-U compte pour deux unités."
         }
       }
     },

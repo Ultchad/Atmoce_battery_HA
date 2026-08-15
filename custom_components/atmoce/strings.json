@@ -14,14 +14,15 @@
         }
       },
       "battery": {
-        "title": "Battery model",
-        "description": "Select your battery model and how many units are installed. This sets the usable capacity and the power limits.",
+        "title": "Batteries",
+        "description": "How many Atmoce MS-7K-U batteries are installed? Atmoce ships a single 7 kWh unit, so the count is all that is needed to work out the usable capacity and the power limits. An MS-14K-U is two of these units.",
         "data": {
-          "battery_model": "Model",
-          "battery_count": "Number of batteries"
+          "battery_count": "Number of batteries",
+          "manual_specs": "Enter specifications manually instead"
         },
         "data_description": {
-          "battery_count": "Stacked units of the same model. Capacity and power are multiplied by this number. If your inverter caps the total power below that, choose Manual specs instead and enter the real totals."
+          "battery_count": "Each unit adds 7 kWh, 3.75 kW of charge power and 4.5 kW of discharge power.",
+          "manual_specs": "Tick this for different hardware, or if your inverter caps the total power below the sum of the units."
         }
       },
       "manual_battery": {
@@ -72,11 +73,10 @@
         "title": "Battery stack",
         "description": "Use this after adding or removing a battery. Capacity and power limits are set once at setup and feed the autonomy sensor and the forced-power sliders, so they need restating when the stack changes.\n\nNothing else is touched: your gateway, credentials and entity history all stay as they are.",
         "data": {
-          "battery_model": "Model",
           "battery_count": "Number of batteries"
         },
         "data_description": {
-          "battery_count": "Stacked units of the same model. Capacity and power are multiplied by this number."
+          "battery_count": "Each MS-7K-U unit adds 7 kWh, 3.75 kW of charge power and 4.5 kW of discharge power. An MS-14K-U counts as two units."
         }
       }
     },

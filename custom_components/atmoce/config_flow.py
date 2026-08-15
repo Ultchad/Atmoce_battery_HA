@@ -24,6 +24,7 @@ from .const import (
     CONF_CLOUD_WEB_EMAIL,
     CONF_CLOUD_WEB_PASSWORD,
     CONF_DISCHARGE_KW,
+    CONF_MANUAL_SPECS,
     CONF_RETRY_COUNT,
     CONF_SLAVE,
     CREDENTIAL_KEYS,
@@ -33,6 +34,7 @@ from .const import (
     DOMAIN,
     MAX_BATTERY_COUNT,
     MODBUS_RETRY_COUNT,
+    UNIT_BATTERY_MODEL,
 )
 from .modbus_client import AtmoceModbusClient
 
@@ -65,12 +67,10 @@ def _gateway_schema(
 # ── Step 2: battery model ────────────────────────────────────────────────────
 STEP_BATTERY_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_BATTERY_MODEL, default="MS-7K-U"): vol.In(
-            {k: v["label"] for k, v in BATTERY_MODELS.items()}
-        ),
         vol.Required(CONF_BATTERY_COUNT, default=DEFAULT_BATTERY_COUNT): vol.All(
             int, vol.Range(min=1, max=MAX_BATTERY_COUNT)
         ),
+        vol.Optional(CONF_MANUAL_SPECS, default=False): bool,
     }
 )
 
@@ -119,27 +119,47 @@ STEP_FALLBACK_SCHEMA = vol.Schema(
 )
 
 
-# BATTERY_MODELS carries a "manual" placeholder whose specs are all None; it is
-# a routing choice in the setup wizard, not something that can be multiplied.
-CATALOGUE_MODELS = {
-    k: v for k, v in BATTERY_MODELS.items() if v["capacity_kwh"] is not None
-}
-
-
-def _specs_for(model_key: str, count: int) -> dict[str, Any]:
-    """Return the config keys for `count` stacked units of `model_key`.
+def _specs_for(count: int, stored_model: str | None = None) -> dict[str, Any]:
+    """Return the config keys for `count` stacked MS-7K-U units.
 
     Capacity and power scale with the number of units. Rounded because floats
     like 3.75 * 3 land on values such as 11.249999999999998.
+
+    `stored_model` keeps an existing entry's label when it still describes the
+    same stack — an MS-14K-U left at two units stays an MS-14K-U, so the device
+    is not renamed in Home Assistant behind the owner's back. Once the numbers
+    no longer match the label, the stack is expressed in units instead.
     """
-    model = BATTERY_MODELS[model_key]
+    unit = BATTERY_MODELS[UNIT_BATTERY_MODEL]
+    capacity = round(unit["capacity_kwh"] * count, 2)
+
+    legacy = BATTERY_MODELS.get(stored_model or "", {})
+    keeps_label = legacy.get("capacity_kwh") == capacity
+
     return {
-        CONF_BATTERY_MODEL: model_key,
+        CONF_BATTERY_MODEL: stored_model if keeps_label else UNIT_BATTERY_MODEL,
         CONF_BATTERY_COUNT: count,
-        CONF_CAPACITY_KWH: round(model["capacity_kwh"] * count, 2),
-        CONF_CHARGE_KW: round(model["charge_kw"] * count, 2),
-        CONF_DISCHARGE_KW: round(model["discharge_kw"] * count, 2),
+        CONF_CAPACITY_KWH: capacity,
+        CONF_CHARGE_KW: round(unit["charge_kw"] * count, 2),
+        CONF_DISCHARGE_KW: round(unit["discharge_kw"] * count, 2),
     }
+
+
+def _stored_count(entry_data: dict[str, Any]) -> int:
+    """Best guess at how many units an existing entry represents.
+
+    Entries created before the count existed have no such key, so derive it
+    from the stored capacity: an MS-14K-U comes out as the two units it is.
+    """
+    if (count := entry_data.get(CONF_BATTERY_COUNT)) is not None:
+        return max(1, min(MAX_BATTERY_COUNT, int(count)))
+
+    capacity = entry_data.get(CONF_CAPACITY_KWH)
+    unit_capacity = BATTERY_MODELS[UNIT_BATTERY_MODEL]["capacity_kwh"]
+    if capacity:
+        return max(1, min(MAX_BATTERY_COUNT, round(capacity / unit_capacity)))
+
+    return DEFAULT_BATTERY_COUNT
 
 
 class AtmoceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -185,20 +205,16 @@ class AtmoceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    # ── Step 2: battery model ────────────────────────────────────────────────
+    # ── Step 2: how many batteries ───────────────────────────────────────────
     async def async_step_battery(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         if user_input is not None:
-            self._data[CONF_BATTERY_MODEL] = user_input[CONF_BATTERY_MODEL]
-            if user_input[CONF_BATTERY_MODEL] == "manual":
+            if user_input.get(CONF_MANUAL_SPECS):
+                self._data[CONF_BATTERY_MODEL] = "manual"
                 return await self.async_step_manual_battery()
-            # Pre-fill specs from catalogue
             self._data.update(
-                _specs_for(
-                    user_input[CONF_BATTERY_MODEL],
-                    user_input.get(CONF_BATTERY_COUNT, DEFAULT_BATTERY_COUNT),
-                )
+                _specs_for(user_input.get(CONF_BATTERY_COUNT, DEFAULT_BATTERY_COUNT))
             )
             return await self.async_step_cloud()
 
@@ -276,28 +292,16 @@ class AtmoceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_update_reload_and_abort(
                 entry,
                 data_updates=_specs_for(
-                    user_input[CONF_BATTERY_MODEL],
                     user_input[CONF_BATTERY_COUNT],
+                    stored_model=entry.data.get(CONF_BATTERY_MODEL),
                 ),
             )
 
-        stored_model = entry.data.get(CONF_BATTERY_MODEL)
         schema = vol.Schema(
             {
                 vol.Required(
-                    CONF_BATTERY_MODEL,
-                    # An entry set up with manual specs has no catalogue model to
-                    # fall back on, so offer the default rather than "manual",
-                    # whose specs are None and cannot be scaled.
-                    default=(
-                        stored_model
-                        if stored_model in CATALOGUE_MODELS
-                        else "MS-7K-U"
-                    ),
-                ): vol.In({k: v["label"] for k, v in CATALOGUE_MODELS.items()}),
-                vol.Required(
                     CONF_BATTERY_COUNT,
-                    default=entry.data.get(CONF_BATTERY_COUNT, DEFAULT_BATTERY_COUNT),
+                    default=_stored_count(entry.data),
                 ): vol.All(int, vol.Range(min=1, max=MAX_BATTERY_COUNT)),
             }
         )

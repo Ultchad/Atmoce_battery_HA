@@ -176,33 +176,52 @@ class TestBatteryCount:
     @pytest.mark.asyncio
     async def test_single_battery_matches_the_catalogue(self):
         flow = self._make_flow()
-        await flow.async_step_battery({
-            CONF_BATTERY_MODEL: "MS-7K-U",
-            CONF_BATTERY_COUNT: 1,
-        })
+        await flow.async_step_battery({CONF_BATTERY_COUNT: 1})
 
         assert flow._data[CONF_CAPACITY_KWH] == 7.0
         assert flow._data[CONF_CHARGE_KW] == 3.75
         assert flow._data[CONF_DISCHARGE_KW] == 4.5
+        assert flow._data[CONF_BATTERY_MODEL] == "MS-7K-U"
 
     @pytest.mark.asyncio
     async def test_two_batteries_double_capacity_and_power(self):
         flow = self._make_flow()
-        await flow.async_step_battery({
-            CONF_BATTERY_MODEL: "MS-7K-U",
-            CONF_BATTERY_COUNT: 2,
-        })
+        await flow.async_step_battery({CONF_BATTERY_COUNT: 2})
 
         assert flow._data[CONF_CAPACITY_KWH] == 14.0
         assert flow._data[CONF_CHARGE_KW] == 7.5
         assert flow._data[CONF_DISCHARGE_KW] == 9.0
         assert flow._data[CONF_BATTERY_COUNT] == 2
 
+    @pytest.mark.asyncio
+    async def test_no_model_is_asked_for(self):
+        """Atmoce ships one unit, so setup asks a count, not a model."""
+        flow = self._make_flow()
+        await flow.async_step_battery(None)
+
+        _, kwargs = flow.async_show_form.call_args
+        fields = {str(k) for k in kwargs["data_schema"].schema}
+        assert CONF_BATTERY_MODEL not in fields
+        assert CONF_BATTERY_COUNT in fields
+
+    @pytest.mark.asyncio
+    async def test_manual_checkbox_routes_to_manual_specs(self):
+        flow = self._make_flow()
+        flow.async_step_manual_battery = AsyncMock(return_value={"type": "form"})
+
+        await flow.async_step_battery({
+            CONF_BATTERY_COUNT: 1,
+            "manual_specs": True,
+        })
+
+        flow.async_step_manual_battery.assert_awaited_once()
+        assert flow._data[CONF_BATTERY_MODEL] == "manual"
+
     def test_three_batteries_avoid_float_drift(self):
         """3 * 3.75 must not land on 11.249999999999998."""
         from custom_components.atmoce.config_flow import _specs_for
 
-        specs = _specs_for("MS-7K-U", 3)
+        specs = _specs_for(3)
         assert specs[CONF_CHARGE_KW] == 11.25
         assert specs[CONF_CAPACITY_KWH] == 21.0
 
@@ -257,8 +276,52 @@ class TestReconfigure:
         assert defaults[CONF_BATTERY_COUNT] == 3
 
     @pytest.mark.asyncio
+    async def test_legacy_14k_entry_counts_as_two_units(self):
+        """Entries predating the count key must not read as a single unit."""
+        flow, _ = self._make_flow({
+            CONF_BATTERY_MODEL: "MS-14K-U",
+            CONF_CAPACITY_KWH: 14.0,
+        })
+
+        await flow.async_step_reconfigure(None)
+
+        _, kwargs = flow.async_show_form.call_args
+        defaults = {
+            str(k): k.default() for k in kwargs["data_schema"].schema
+        }
+        assert defaults[CONF_BATTERY_COUNT] == 2
+
+    @pytest.mark.asyncio
+    async def test_unchanged_14k_stack_keeps_its_device_name(self):
+        """battery_model is the HA device model — do not rename it silently."""
+        flow, _ = self._make_flow({
+            CONF_BATTERY_MODEL: "MS-14K-U",
+            CONF_CAPACITY_KWH: 14.0,
+        })
+
+        await flow.async_step_reconfigure({CONF_BATTERY_COUNT: 2})
+
+        _, kwargs = flow.async_update_reload_and_abort.call_args
+        assert kwargs["data_updates"][CONF_BATTERY_MODEL] == "MS-14K-U"
+        assert kwargs["data_updates"][CONF_CAPACITY_KWH] == 14.0
+
+    @pytest.mark.asyncio
+    async def test_growing_a_14k_stack_switches_to_units(self):
+        """Once the numbers outgrow the label, express the stack in units."""
+        flow, _ = self._make_flow({
+            CONF_BATTERY_MODEL: "MS-14K-U",
+            CONF_CAPACITY_KWH: 14.0,
+        })
+
+        await flow.async_step_reconfigure({CONF_BATTERY_COUNT: 3})
+
+        _, kwargs = flow.async_update_reload_and_abort.call_args
+        assert kwargs["data_updates"][CONF_BATTERY_MODEL] == "MS-7K-U"
+        assert kwargs["data_updates"][CONF_CAPACITY_KWH] == 21.0
+
+    @pytest.mark.asyncio
     async def test_manual_entry_does_not_break_the_form(self):
-        """A manually specified entry has no catalogue model to pre-select."""
+        """A manual entry has no count and no catalogue capacity to derive one."""
         flow, _ = self._make_flow({CONF_BATTERY_MODEL: "manual"})
 
         await flow.async_step_reconfigure(None)
@@ -267,23 +330,7 @@ class TestReconfigure:
         defaults = {
             str(k): k.default() for k in kwargs["data_schema"].schema
         }
-        assert defaults[CONF_BATTERY_MODEL] == "MS-7K-U"
-
-    @pytest.mark.asyncio
-    async def test_manual_is_not_offered_as_a_choice(self):
-        """"manual" has None specs — scaling it would raise TypeError."""
-        flow, _ = self._make_flow({CONF_BATTERY_MODEL: "MS-7K-U"})
-
-        await flow.async_step_reconfigure(None)
-
-        _, kwargs = flow.async_show_form.call_args
-        model_field = next(
-            k for k in kwargs["data_schema"].schema
-            if str(k) == CONF_BATTERY_MODEL
-        )
-        choices = kwargs["data_schema"].schema[model_field].container
-        assert "manual" not in choices
-        assert "MS-7K-U" in choices
+        assert defaults[CONF_BATTERY_COUNT] == 1
 
 
 class TestGatewayStepConnectivity:
