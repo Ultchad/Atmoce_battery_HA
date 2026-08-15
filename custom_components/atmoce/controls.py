@@ -151,10 +151,10 @@ class AtmoceDispatchPower(AtmoceNumber):
 # ── Battery SOC limits (web portal login) ─────────────────────────────────────
 # These map to the charge / discharge / safety-reserve limits editable in the
 # ATMOZEN app. They are NOT available over Modbus, so they are read and written
-# through the web-portal private API and are only available when the Atmoce Cloud
+# through the web-portal private API and are only available when the atmocecloud.com
 # login (email + password) is configured.
 
-class AtmoceCloudSOCNumber(AtmoceNumber):
+class AtmoceWebSOCNumber(AtmoceNumber):
     """Base for a battery SOC limit backed by the web-portal login."""
 
     _attr_native_step = 1
@@ -166,10 +166,10 @@ class AtmoceCloudSOCNumber(AtmoceNumber):
         return super().available and self.coordinator.soc_control_available
 
     async def async_set_native_value(self, value: float) -> None:
-        await self.coordinator.async_set_cloud_soc_limit(self._key, int(value))
+        await self.coordinator.async_set_web_soc_limit(self._key, int(value))
 
 
-class AtmoceEndOfChargeSOC(AtmoceCloudSOCNumber):
+class AtmoceEndOfChargeSOC(AtmoceWebSOCNumber):
     """Charge limit — the SOC at which charging stops (endOfChargeSOC)."""
 
     _attr_native_min_value = END_OF_CHARGE_SOC_MIN
@@ -180,7 +180,7 @@ class AtmoceEndOfChargeSOC(AtmoceCloudSOCNumber):
         super().__init__(coordinator, KEY_END_OF_CHARGE_SOC, "Charge Limit SOC")
 
 
-class AtmoceEndOfDischargeSOC(AtmoceCloudSOCNumber):
+class AtmoceEndOfDischargeSOC(AtmoceWebSOCNumber):
     """Discharge limit — the SOC at which discharging stops (endOfDischargeSOC)."""
 
     _attr_native_min_value = END_OF_DISCHARGE_SOC_MIN
@@ -191,7 +191,7 @@ class AtmoceEndOfDischargeSOC(AtmoceCloudSOCNumber):
         super().__init__(coordinator, KEY_END_OF_DISCHARGE_SOC, "Discharge Limit SOC")
 
 
-class AtmoceBatteryReservedSOC(AtmoceCloudSOCNumber):
+class AtmoceBatteryReservedSOC(AtmoceWebSOCNumber):
     """Safety/backup reserve — battery stops discharging here except on a grid outage.
 
     Valid range is [endOfDischargeSOC, endOfChargeSOC]; the bounds follow the two

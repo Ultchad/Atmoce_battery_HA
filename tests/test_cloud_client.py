@@ -3,7 +3,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from custom_components.atmoce.cloud_client import AtmoceCloudClient
+from custom_components.atmoce.cloud_client import (
+    AtmoceCloudAuthError,
+    AtmoceCloudClient,
+    AtmoceCloudError,
+)
 
 
 def _mock_response(json_data: dict, status: int = 200) -> MagicMock:
@@ -83,7 +87,7 @@ class TestAuthentication:
             session.post = AsyncMock(return_value=fail_resp)
             mock_cls.return_value = session
 
-            with pytest.raises(PermissionError, match="Cloud auth failed"):
+            with pytest.raises(AtmoceCloudAuthError, match="Cloud auth failed"):
                 await client._async_authenticate()
 
 
@@ -135,23 +139,95 @@ class TestFetchSiteData:
         assert data["comm_control_mode"] is None
         assert data["forced_cmd"] is None
 
+def _patched_session(get_responses: list, post_responses: list | None = None):
+    """Patch aiohttp.ClientSession with ordered GET/POST responses.
+
+    Returns (context_manager, session) so tests can assert on call counts.
+    """
+    session = MagicMock()
+    session.__aenter__ = AsyncMock(return_value=session)
+    session.__aexit__ = AsyncMock(return_value=False)
+
+    for resp in [*get_responses, *(post_responses or [])]:
+        resp.__aenter__ = AsyncMock(return_value=resp)
+        resp.__aexit__ = AsyncMock(return_value=False)
+
+    session.get = AsyncMock(side_effect=list(get_responses))
+    session.post = AsyncMock(side_effect=list(post_responses or []))
+
+    patcher = patch("aiohttp.ClientSession", return_value=session)
+    return patcher, session
+
+
+class TestTokenExpiry:
+    """A cached token that the portal has expired must not wedge the client."""
+
+    @pytest.mark.asyncio
+    async def test_expired_token_is_refreshed_and_fetch_retried(self):
+        client = AtmoceCloudClient("key", "secret")
+        client._access_token = "stale-token"
+
+        rejected = _mock_response({"success": False, "reason": "token expired"})
+        ok = _mock_response(SITE_DATA_OK)
+        auth = _mock_response(AUTH_OK)
+
+        patcher, session = _patched_session([rejected, ok], [auth])
+        with patcher:
+            data = await client.async_fetch_site_data("SN123")
+
+        # Re-authenticated once and re-issued the fetch, rather than giving up.
+        assert session.post.await_count == 1
+        assert session.get.await_count == 2
+        assert client._access_token == "test-token-abc"
+        assert data["battery_soc"] == 75
+
+    @pytest.mark.asyncio
+    async def test_retry_happens_only_once(self):
+        """A persistently failing endpoint must not loop."""
+        client = AtmoceCloudClient("key", "secret")
+        client._access_token = "stale-token"
+
+        rejected = _mock_response({"success": False, "reason": "site not found"})
+        rejected2 = _mock_response({"success": False, "reason": "site not found"})
+        auth = _mock_response(AUTH_OK)
+
+        patcher, session = _patched_session([rejected, rejected2], [auth])
+        with patcher:
+            with pytest.raises(AtmoceCloudError):
+                await client.async_fetch_site_data("SN123")
+
+        assert session.get.await_count == 2
+        assert session.post.await_count == 1
+
+    @pytest.mark.asyncio
+    async def test_no_retry_when_there_was_no_token(self):
+        """A cold client that fails auth should surface it, not retry blindly."""
+        client = AtmoceCloudClient("bad", "creds")
+
+        auth_fail = _mock_response({"success": False, "reason": "invalid credentials"})
+
+        patcher, session = _patched_session([], [auth_fail])
+        with patcher:
+            with pytest.raises(AtmoceCloudAuthError):
+                await client.async_fetch_site_data("SN123")
+
+        assert session.post.await_count == 1
+        assert session.get.await_count == 0
+
+
+class TestFetchErrors:
     @pytest.mark.asyncio
     async def test_fetch_raises_on_api_error(self):
         client = AtmoceCloudClient("key", "secret")
         client._access_token = "test-token"
 
-        fail_resp = _mock_response({"success": False, "reason": "site not found"})
+        fail1 = _mock_response({"success": False, "reason": "site not found"})
+        fail2 = _mock_response({"success": False, "reason": "site not found"})
+        auth = _mock_response(AUTH_OK)
 
-        with patch("aiohttp.ClientSession") as mock_cls:
-            session = MagicMock()
-            session.__aenter__ = AsyncMock(return_value=session)
-            session.__aexit__ = AsyncMock(return_value=False)
-            fail_resp.__aenter__ = AsyncMock(return_value=fail_resp)
-            fail_resp.__aexit__ = AsyncMock(return_value=False)
-            session.get = AsyncMock(return_value=fail_resp)
-            mock_cls.return_value = session
-
-            with pytest.raises(ValueError, match="Cloud data fetch failed"):
+        patcher, _ = _patched_session([fail1, fail2], [auth])
+        with patcher:
+            with pytest.raises(AtmoceCloudError, match="Cloud data fetch failed"):
                 await client.async_fetch_site_data("SN123")
 
     @pytest.mark.asyncio
@@ -159,16 +235,11 @@ class TestFetchSiteData:
         client = AtmoceCloudClient("key", "secret")
         client._access_token = "test-token"
 
-        empty_resp = _mock_response({"success": True, "data": []})
+        empty1 = _mock_response({"success": True, "data": []})
+        empty2 = _mock_response({"success": True, "data": []})
+        auth = _mock_response(AUTH_OK)
 
-        with patch("aiohttp.ClientSession") as mock_cls:
-            session = MagicMock()
-            session.__aenter__ = AsyncMock(return_value=session)
-            session.__aexit__ = AsyncMock(return_value=False)
-            empty_resp.__aenter__ = AsyncMock(return_value=empty_resp)
-            empty_resp.__aexit__ = AsyncMock(return_value=False)
-            session.get = AsyncMock(return_value=empty_resp)
-            mock_cls.return_value = session
-
-            with pytest.raises(ValueError):
+        patcher, _ = _patched_session([empty1, empty2], [auth])
+        with patcher:
+            with pytest.raises(AtmoceCloudError):
                 await client.async_fetch_site_data("SN123")

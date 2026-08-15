@@ -3,11 +3,27 @@ from __future__ import annotations
 
 from typing import Any
 
+from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .const import CONF_CLOUD_APP_KEY, CONF_CLOUD_APP_SECRET, DOMAIN
+from .const import (
+    CONF_CLOUD_APP_KEY,
+    CONF_CLOUD_APP_SECRET,
+    CONF_CLOUD_WEB_EMAIL,
+    CONF_CLOUD_WEB_PASSWORD,
+    DOMAIN,
+)
 from .coordinator import AtmoceCoordinator
+
+# Credentials that must never appear in a diagnostics download — these files are
+# routinely attached to public GitHub issues.
+TO_REDACT = {
+    CONF_CLOUD_APP_KEY,
+    CONF_CLOUD_APP_SECRET,
+    CONF_CLOUD_WEB_EMAIL,
+    CONF_CLOUD_WEB_PASSWORD,
+}
 
 
 async def async_get_config_entry_diagnostics(
@@ -15,14 +31,11 @@ async def async_get_config_entry_diagnostics(
 ) -> dict[str, Any]:
     coordinator: AtmoceCoordinator = hass.data[DOMAIN][entry.entry_id]
 
-    # Redact sensitive fields
-    safe_data = dict(entry.data)
-    for key in (CONF_CLOUD_APP_KEY, CONF_CLOUD_APP_SECRET):
-        if key in safe_data:
-            safe_data[key] = "**REDACTED**"
-
     return {
-        "config_entry": safe_data,
+        # The options flow stores the same credentials as the initial config
+        # flow, so both mappings need redacting.
+        "config_entry": async_redact_data(entry.data, TO_REDACT),
+        "options": async_redact_data(entry.options or {}, TO_REDACT),
         "coordinator": {
             "active_source": coordinator.active_source,
             "connection_errors": coordinator.connection_errors,

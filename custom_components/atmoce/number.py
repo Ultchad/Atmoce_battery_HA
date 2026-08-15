@@ -24,7 +24,7 @@ async def async_setup_entry(
         AtmoceForcedDuration(coordinator),
         AtmoceForcedPower(coordinator),
         AtmoceDispatchPower(coordinator),
-        # Cloud-only SOC limits (charge / discharge / backup reserve)
+        # Web-portal SOC limits (charge / discharge / backup reserve)
         AtmoceEndOfChargeSOC(coordinator),
         AtmoceEndOfDischargeSOC(coordinator),
         AtmoceBatteryReservedSOC(coordinator),

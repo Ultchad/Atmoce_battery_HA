@@ -1,0 +1,14 @@
+# Local session/working notes — not project documentation
+CLAUDE.local.md
+.claude/
+
+# Local credentials — must never be committed to a public repo
+CLAVES DEFAULT/
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
