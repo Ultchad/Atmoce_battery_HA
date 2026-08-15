@@ -155,3 +155,52 @@ class TestDiagnosticsRedaction:
 
         assert result["last_data"]["battery_soc"] == 80
         assert result["last_data"]["pv_power"] == 1500
+
+
+class TestCredentialsStoredOnce:
+    """Credentials must live in entry.data only — never a second copy in options."""
+
+    @pytest.mark.asyncio
+    async def test_migration_moves_credentials_out_of_options(self):
+        from custom_components.atmoce import async_migrate_entry
+
+        entry = MagicMock()
+        entry.version = 1
+        entry.data = {"host": "192.168.1.100", CONF_CLOUD_WEB_PASSWORD: "old-pw"}
+        entry.options = {
+            "modbus_retry_count": 5,
+            CONF_CLOUD_WEB_EMAIL: "me@example.com",
+            CONF_CLOUD_WEB_PASSWORD: "new-pw",
+        }
+        hass = MagicMock()
+        hass.config_entries.async_update_entry = MagicMock()
+
+        assert await async_migrate_entry(hass, entry) is True
+
+        kwargs = hass.config_entries.async_update_entry.call_args.kwargs
+        # Secret consolidated into data, with the newer options value winning.
+        assert kwargs["data"][CONF_CLOUD_WEB_PASSWORD] == "new-pw"
+        assert kwargs["data"][CONF_CLOUD_WEB_EMAIL] == "me@example.com"
+        # ...and gone from options, so it is no longer stored twice.
+        assert CONF_CLOUD_WEB_PASSWORD not in kwargs["options"]
+        assert CONF_CLOUD_WEB_EMAIL not in kwargs["options"]
+        # Genuine tunables stay put.
+        assert kwargs["options"]["modbus_retry_count"] == 5
+        assert kwargs["version"] == 2
+
+    @pytest.mark.asyncio
+    async def test_migration_keeps_real_credential_over_blank_option(self):
+        from custom_components.atmoce import async_migrate_entry
+
+        entry = MagicMock()
+        entry.version = 1
+        entry.data = {CONF_CLOUD_WEB_PASSWORD: "real-pw"}
+        entry.options = {CONF_CLOUD_WEB_PASSWORD: ""}
+        hass = MagicMock()
+        hass.config_entries.async_update_entry = MagicMock()
+
+        await async_migrate_entry(hass, entry)
+
+        kwargs = hass.config_entries.async_update_entry.call_args.kwargs
+        assert kwargs["data"][CONF_CLOUD_WEB_PASSWORD] == "real-pw"
+        assert CONF_CLOUD_WEB_PASSWORD not in kwargs["options"]

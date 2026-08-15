@@ -7,7 +7,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN
+from .const import CREDENTIAL_KEYS, DOMAIN
 from .coordinator import AtmoceCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -19,6 +19,37 @@ PLATFORMS: list[Platform] = [
     Platform.SELECT,
     Platform.BUTTON,
 ]
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate an old config entry."""
+    if entry.version == 1:
+        # v1 wrote credentials to entry.data during setup and then a second copy
+        # to entry.options whenever the Configure dialog was saved, leaving the
+        # password persisted twice. Consolidate into entry.data and drop the
+        # copy from options.
+        data = {**entry.data}
+        options = {**entry.options}
+        moved = False
+        for key in CREDENTIAL_KEYS:
+            if key in options:
+                value = options.pop(key)
+                # Options were edited more recently, so they win — but never let
+                # a blank field clobber a real credential in data.
+                if value not in (None, ""):
+                    data[key] = value
+                moved = True
+
+        hass.config_entries.async_update_entry(
+            entry, data=data, options=options, version=2
+        )
+        if moved:
+            _LOGGER.info(
+                "Migrated Atmoce credentials out of entry options; they are now "
+                "stored once, in the config entry data"
+            )
+
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
