@@ -18,12 +18,12 @@ Still under testing with the **Atmoce MS-7K-U** (7 kWh LFP battery). Should be c
 - **27 sensor entities** — grid, PV, battery, system and computed metrics
 - **Full battery control** — force charge/discharge, set target SOC, duration and power
 - **"Administrado por batería" mode** — one selection returns the battery to automatic self-managed mode (also drops out of remote control)
-- **Battery model selector** in setup — MS-7K-U pre-configured, manual entry for other models
+- **Battery count** in setup — say how many MS-7K-U units you have and the capacity and power limits follow; changeable later via **Reconfigure**, with manual entry for other hardware
 - **Automatic Modbus→Cloud fallback** (optional) if the gateway is temporarily unreachable
 - **Active data source sensor** — always know whether you are reading Modbus or Cloud
 - **Computed sensors** — autonomy hours, PV self-consumption rate, battery health
 - **Diagnostics support** — exportable debug info with sensitive fields redacted
-- **Bilingual** — English and Spanish UI out of the box
+- **Trilingual** — English, Spanish and French UI out of the box
 
 ---
 
@@ -40,8 +40,9 @@ Still under testing with the **Atmoce MS-7K-U** (7 kWh LFP battery). Should be c
 
 1. Go to **Settings → Devices & Services → Add Integration** and search for **Atmoce Battery**.
 2. **Step 1 — Gateway**: enter the local IP address of your gateway (MC100 / MG100). The integration will verify connectivity before continuing.
-3. **Step 2 — Battery model**: select your model from the list or choose **Manual** to enter the capacity and power limits yourself.
-4. **Step 3 — Cloud (optional)**: leave disabled for pure local operation. Enable only if you want read-only Cloud fallback when Modbus is unavailable.
+3. **Step 2 — Batteries**: enter how many MS-7K-U units you have. Capacity and power limits are worked out from that. Tick **Enter specifications manually** for different hardware. You can change the count later with **Reconfigure**, without removing the integration.
+4. **Step 3 — atmocecloud.com account (optional)**: your normal portal login. Only needed for the battery SOC limits (charge, discharge and backup reserve), which do not exist over Modbus.
+5. **Step 4 — Cloud monitoring fallback (optional, advanced)**: almost nobody needs this — just submit it. It only covers the gateway going unreachable over Modbus, and it needs partner Open API keys that Atmoce support issues to installers on request.
 
 > **Note**: The Atmoce Gateway must have **Modbus TCP enabled** (port 502, no authentication). This is the default factory setting.
 
@@ -167,7 +168,10 @@ Reload the integration from Settings → Devices & Services → Atmoce Battery �
 The `switch.atmoce_remote_control` must be turned **ON** before sending any charge/discharge command. The battery ignores Modbus write commands when in local mode.
 
 **Sensors show "unavailable" after a few hours.**
-Enable the Cloud fallback in the integration options (Settings → Devices & Services → Atmoce Battery → Configure) and enter your Atmoce Cloud API credentials. The integration will switch automatically when Modbus is unreachable.
+The gateway has stopped answering over Modbus. The Cloud fallback covers this, but it needs partner Open API keys (`app_key` / `app_secret`) that do not ship with the hardware — per the Open API manual §3.1.2 the installer requests them by email from Atmoce support. Without them, check the gateway's network connection instead; the fallback cannot be enabled.
+
+**Where do I get the app_key and app_secret?**
+You almost certainly do not need them: the battery SOC limits use your ordinary atmocecloud.com login, not these. They exist only for the Cloud monitoring fallback, are meant for installers managing several sites, and are issued by Atmoce support on request. There is no self-service page that generates them.
 
 **How do I know if data is coming from Modbus or Cloud?**
 Check `sensor.atmoce_active_data_source` — it shows `Modbus` or `Cloud`.
