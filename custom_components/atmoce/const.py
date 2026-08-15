@@ -128,6 +128,16 @@ CONF_CLOUD_WEB_EMAIL    = "cloud_web_email"     # atmocecloud.com login (for SOC
 CONF_CLOUD_WEB_PASSWORD = "cloud_web_password"
 CONF_RETRY_COUNT      = "modbus_retry_count"
 
+# Credentials live in entry.data only. The options flow edits them in place there
+# instead of writing a second copy into entry.options, so a secret is never
+# persisted twice on disk.
+CREDENTIAL_KEYS = (
+    CONF_CLOUD_APP_KEY,
+    CONF_CLOUD_APP_SECRET,
+    CONF_CLOUD_WEB_EMAIL,
+    CONF_CLOUD_WEB_PASSWORD,
+)
+
 # Base host for the private web-portal API (login + storageModel)
 CLOUD_WEB_BASE_URL = "https://www.atmocecloud.com"
 

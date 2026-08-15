@@ -19,6 +19,14 @@ _TOKEN_URL = f"{CLOUD_BASE_URL}/auth/token"
 _SITES_URL = f"{CLOUD_BASE_URL}/sites/getSitesLastPower"
 
 
+class AtmoceCloudError(Exception):
+    """The Cloud Open API rejected the request or returned no usable data."""
+
+
+class AtmoceCloudAuthError(AtmoceCloudError):
+    """Authentication against the Cloud Open API failed."""
+
+
 class AtmoceCloudClient:
     """Minimal async Cloud client for monitoring fallback."""
 
@@ -39,11 +47,24 @@ class AtmoceCloudClient:
             )
             data = await resp.json()
         if not data.get("success"):
-            raise PermissionError(f"Cloud auth failed: {data.get('reason')}")
+            raise AtmoceCloudAuthError(f"Cloud auth failed: {data.get('reason')}")
         self._access_token = data["data"]["access_token"]
 
     async def async_fetch_site_data(self, serial_number: str) -> dict[str, Any]:
         """Fetch latest site data and map to the same keys as Modbus fetch."""
+        try:
+            return await self._async_fetch_once(serial_number)
+        except AtmoceCloudError:
+            # A cached access token that the portal has since expired looks the
+            # same as any other rejection, so drop it and retry once with a fresh
+            # one. Without this the client stays wedged on a stale token forever.
+            if self._access_token is None:
+                raise
+            _LOGGER.debug("Cloud fetch rejected — re-authenticating and retrying once")
+            self._access_token = None
+            return await self._async_fetch_once(serial_number)
+
+    async def _async_fetch_once(self, serial_number: str) -> dict[str, Any]:
         if not self._access_token:
             await self._async_authenticate()
 
@@ -56,7 +77,7 @@ class AtmoceCloudClient:
             payload = await resp.json()
 
         if not payload.get("success") or not payload.get("data"):
-            raise ValueError(f"Cloud data fetch failed: {payload.get('reason')}")
+            raise AtmoceCloudError(f"Cloud data fetch failed: {payload.get('reason')}")
 
         site = payload["data"][0]
 

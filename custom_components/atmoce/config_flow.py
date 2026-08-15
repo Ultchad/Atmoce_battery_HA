@@ -5,14 +5,12 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-from pymodbus.exceptions import ModbusException
-
-
-from homeassistant.helpers import selector
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import callback
+from homeassistant.helpers import selector
+from pymodbus.exceptions import ModbusException
 
 from .const import (
     BATTERY_MODELS,
@@ -27,6 +25,7 @@ from .const import (
     CONF_DISCHARGE_KW,
     CONF_RETRY_COUNT,
     CONF_SLAVE,
+    CREDENTIAL_KEYS,
     DEFAULT_PORT,
     DEFAULT_SLAVE,
     DOMAIN,
@@ -107,7 +106,7 @@ STEP_CLOUD_SCHEMA = vol.Schema(
 class AtmoceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle the Atmoce config flow."""
 
-    VERSION = 1
+    VERSION = 2
 
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
@@ -276,9 +275,23 @@ class AtmoceOptionsFlow(config_entries.OptionsFlow):
                 errors["base"] = "cloud_credentials_required"
 
             if not errors:
-                return self.async_create_entry(title="", data=user_input)
+                # Credentials belong in entry.data. Update them in place rather
+                # than storing a second copy in entry.options, so the password
+                # only ever exists once on disk.
+                tunables = {k: v for k, v in user_input.items() if k not in CREDENTIAL_KEYS}
+                credentials = {
+                    k: user_input[k] for k in CREDENTIAL_KEYS if k in user_input
+                }
+                if credentials:
+                    self.hass.config_entries.async_update_entry(
+                        self.config_entry,
+                        data={**self.config_entry.data, **credentials},
+                    )
+                return self.async_create_entry(title="", data=tunables)
 
-        current = self.config_entry.options or self.config_entry.data
+        # entry.data holds the credentials, entry.options the tunables — the form
+        # needs both to pre-fill correctly.
+        current = {**self.config_entry.data, **self.config_entry.options}
 
         schema = vol.Schema(
             {
