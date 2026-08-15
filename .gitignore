@@ -1,3 +1,6 @@
+# Local session/working notes — not project documentation
+CLAUDE.local.md
+
 __pycache__/
 *.py[cod]
 .pytest_cache/
