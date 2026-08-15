@@ -4,8 +4,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
-from .coordinator import AtmoceCoordinator
 from .controls import AtmoceResetButton
+from .coordinator import AtmoceCoordinator
 
 
 async def async_setup_entry(

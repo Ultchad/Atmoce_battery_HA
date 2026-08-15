@@ -11,7 +11,9 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from pymodbus.exceptions import ModbusException
 
+from .cloud_client import AtmoceCloudClient, AtmoceCloudError
 from .const import (
     CONF_BATTERY_MODEL,
     CONF_CAPACITY_KWH,
@@ -38,9 +40,6 @@ from .const import (
     WEB_FIELD_CHARGE_CUTOFF_SOC,
     WEB_FIELD_DISCHARGE_CUTOFF_SOC,
 )
-from pymodbus.exceptions import ModbusException
-
-from .cloud_client import AtmoceCloudClient, AtmoceCloudError
 from .modbus_client import AtmoceModbusClient
 
 # Everything that can go wrong reaching the Cloud Open API. The fallback is
@@ -296,7 +295,7 @@ class AtmoceCoordinator(DataUpdateCoordinator):
     def _get_web_client(self) -> Any:
         """Return a persistent web-portal client, creating it on first use."""
         if self._web_client is None:
-            from .web_client import AtmoceWebClient  # noqa: PLC0415
+            from .web_client import AtmoceWebClient
 
             self._web_client = AtmoceWebClient(self._web_email, self._web_password)
         return self._web_client
@@ -319,7 +318,7 @@ class AtmoceCoordinator(DataUpdateCoordinator):
         try:
             station_id = await self._async_station_id()
             model = await self._get_web_client().async_read_model(station_id)
-        except Exception as exc:  # noqa: BLE001 — best-effort background load
+        except Exception as exc:
             _LOGGER.warning("Could not read battery SOC limits: %s", exc, exc_info=True)
             return
 
@@ -352,7 +351,7 @@ class AtmoceCoordinator(DataUpdateCoordinator):
         try:
             station_id = await self._async_station_id()
             await self._get_web_client().async_change_model(station_id, {field: int(value)})
-        except Exception as exc:  # noqa: BLE001 — surfaced to the user below
+        except Exception as exc:
             raise HomeAssistantError(f"Portal write failed for {key}: {exc}") from exc
 
         # Optimistic update; the next load reconciles with the portal.

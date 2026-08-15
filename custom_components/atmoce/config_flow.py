@@ -5,14 +5,12 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-from pymodbus.exceptions import ModbusException
-
-
-from homeassistant.helpers import selector
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import callback
+from homeassistant.helpers import selector
+from pymodbus.exceptions import ModbusException
 
 from .const import (
     BATTERY_MODELS,
