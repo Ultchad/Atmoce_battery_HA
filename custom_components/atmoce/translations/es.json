@@ -30,15 +30,31 @@
         }
       },
       "cloud": {
-        "title": "Atmoce Cloud (opcional)",
-        "description": "Dos funciones opcionales e independientes. El fallback de monitorización (app_key/app_secret) requiere claves de la Open API de partner de Atmoce. Los límites de batería (carga/descarga/reserva de seguridad) solo necesitan tu login normal de atmocecloud.com (email + contraseña).",
+        "title": "Cuenta de atmocecloud.com (opcional)",
+        "description": "Introduce **tu login habitual de atmocecloud.com**, el mismo que usas en la app ATMOZEN.\n\nSirve para controlar los **límites de batería**: SOC de fin de carga, de fin de descarga y reserva de seguridad. Esos tres ajustes no existen en Modbus, así que es la única vía para modificarlos desde Home Assistant.\n\nSi lo dejas en blanco, todo lo demás funciona igual, pero los tres controles de límites aparecerán como no disponibles.",
+        "data": {
+          "cloud_web_email": "Email de atmocecloud.com",
+          "cloud_web_password": "Contraseña de atmocecloud.com"
+        },
+        "data_description": {
+          "cloud_web_email": "El email con el que entras en atmocecloud.com o en la app ATMOZEN.",
+          "cloud_web_password": "La contraseña de esa misma cuenta. Se guarda en tu Home Assistant y nunca aparece en los diagnósticos."
+        }
+      },
+      "fallback": {
+        "title": "Fallback de monitorización Cloud (avanzado)",
+        "description": "**Casi nadie necesita este paso: pulsa Enviar y listo.**\n\nSirve solo para un caso raro: que el gateway deje de responder por Modbus en la red local. Si eso ocurre y activas esta opción, la integración seguiría leyendo datos de la Open API de Atmoce mientras dure el fallo. Es únicamente monitorización de respaldo, no añade ningún control.\n\nRequiere `app_key` y `app_secret`, que **no vienen con tu equipo y no se pueden generar desde ninguna web**. Según el manual de la Open API (§3.1.2) las solicita el instalador por email al soporte de Atmoce, indicando nombre del instalador, nombre y descripción del sistema, y aceptando la licencia de la API. Están pensadas para instaladores e integradores que gestionan varias instalaciones.\n\nSi no las tienes, deja el interruptor desactivado y los campos vacíos.",
         "data": {
           "cloud_enabled": "Activar fallback de monitorización Cloud",
-          "cloud_app_key": "API app_key (Open API, opcional)",
-          "cloud_app_secret": "API app_secret (Open API, opcional)",
-          "cloud_web_email": "Email de atmocecloud.com (para los límites de batería)",
-          "cloud_web_password": "Contraseña de atmocecloud.com",
+          "cloud_app_key": "API app_key (Open API)",
+          "cloud_app_secret": "API app_secret (Open API)",
           "modbus_retry_count": "Fallos Modbus antes de cambiar a Cloud"
+        },
+        "data_description": {
+          "cloud_enabled": "Actívalo solo si el soporte de Atmoce te ha dado app_key y app_secret; sin ellas el formulario no te dejará continuar.",
+          "cloud_app_key": "La entrega el soporte de Atmoce. No es tu contraseña ni se genera desde el portal.",
+          "cloud_app_secret": "Se entrega junto con la app_key.",
+          "modbus_retry_count": "Cuántos fallos seguidos de Modbus hacen falta antes de tirar del Cloud."
         }
       },
       "reauth_confirm": {
@@ -63,6 +79,7 @@
     "step": {
       "init": {
         "title": "Opciones de Atmoce",
+        "description": "Dos funciones independientes con credenciales distintas.\n\n**Límites de batería** (carga/descarga/reserva): solo tu login de atmocecloud.com, email y contraseña.\n\n**Fallback de monitorización**: `app_key` y `app_secret` de la Open API, que se piden al soporte de Atmoce y no vienen con el equipo. Si no las tienes, deja esos campos vacíos y el interruptor desactivado.",
         "data": {
           "modbus_retry_count": "Fallos Modbus antes de cambiar a Cloud",
           "cloud_enabled": "Activar fallback de monitorización Cloud",
@@ -70,6 +87,14 @@
           "cloud_app_secret": "API app_secret (Open API, opcional)",
           "cloud_web_email": "Email de atmocecloud.com (para los límites de batería)",
           "cloud_web_password": "Contraseña de atmocecloud.com"
+        },
+        "data_description": {
+          "modbus_retry_count": "Cuántos fallos seguidos de Modbus hacen falta antes de tirar del Cloud.",
+          "cloud_enabled": "Actívalo solo si tienes app_key y app_secret.",
+          "cloud_app_key": "Se pide al soporte de Atmoce. Déjalo vacío si no la tienes.",
+          "cloud_app_secret": "Se entrega junto con la app_key. Déjalo vacío si no la tienes.",
+          "cloud_web_email": "El email con el que entras en atmocecloud.com o en la app ATMOZEN.",
+          "cloud_web_password": "La contraseña de esa misma cuenta. Aparece ya rellenada con la guardada: si la borras, se borrará también en la configuración."
         }
       }
     },

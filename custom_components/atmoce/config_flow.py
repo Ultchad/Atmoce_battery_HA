@@ -88,14 +88,24 @@ _PASSWORD_SELECTOR = selector.TextSelector(
     selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
 )
 
+# The owner's own atmocecloud.com login — all that the battery SOC limits need.
 STEP_CLOUD_SCHEMA = vol.Schema(
+    {
+        vol.Optional(CONF_CLOUD_WEB_EMAIL, default=""): str,
+        vol.Optional(CONF_CLOUD_WEB_PASSWORD, default=""): _PASSWORD_SELECTOR,
+    }
+)
+
+# ── Step 4: monitoring fallback (rarely needed) ──────────────────────────────
+# Kept apart from the login above because it is a different feature backed by a
+# different API: the partner Open API, whose app_key/app_secret are issued by
+# Atmoce support to installers and do not ship with the hardware. Owners who
+# only want the battery limits should never have to look at these fields.
+STEP_FALLBACK_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_CLOUD_ENABLED, default=False): bool,
         vol.Optional(CONF_CLOUD_APP_KEY, default=""): str,
         vol.Optional(CONF_CLOUD_APP_SECRET, default=""): str,
-        # Web-portal login (email + password) — enables the battery SOC limits
-        vol.Optional(CONF_CLOUD_WEB_EMAIL, default=""): str,
-        vol.Optional(CONF_CLOUD_WEB_PASSWORD, default=""): _PASSWORD_SELECTOR,
         vol.Optional(CONF_RETRY_COUNT, default=MODBUS_RETRY_COUNT): vol.All(
             int, vol.Range(min=1, max=20)
         ),
@@ -179,8 +189,21 @@ class AtmoceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=STEP_MANUAL_BATTERY_SCHEMA,
         )
 
-    # ── Step 3: cloud (optional) ─────────────────────────────────────────────
+    # ── Step 3: atmocecloud.com login (optional) ─────────────────────────────
     async def async_step_cloud(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if user_input is not None:
+            self._data.update(user_input)
+            return await self.async_step_fallback()
+
+        return self.async_show_form(
+            step_id="cloud",
+            data_schema=STEP_CLOUD_SCHEMA,
+        )
+
+    # ── Step 4: monitoring fallback (optional) ───────────────────────────────
+    async def async_step_fallback(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         errors: dict[str, str] = {}
@@ -201,8 +224,8 @@ class AtmoceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return self.async_create_entry(title=title, data=self._data)
 
         return self.async_show_form(
-            step_id="cloud",
-            data_schema=STEP_CLOUD_SCHEMA,
+            step_id="fallback",
+            data_schema=STEP_FALLBACK_SCHEMA,
             errors=errors,
         )
 
