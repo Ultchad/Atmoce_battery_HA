@@ -14,6 +14,7 @@ from pymodbus.exceptions import ModbusException
 
 from .const import (
     BATTERY_MODELS,
+    CONF_BATTERY_COUNT,
     CONF_BATTERY_MODEL,
     CONF_CAPACITY_KWH,
     CONF_CHARGE_KW,
@@ -26,9 +27,11 @@ from .const import (
     CONF_RETRY_COUNT,
     CONF_SLAVE,
     CREDENTIAL_KEYS,
+    DEFAULT_BATTERY_COUNT,
     DEFAULT_PORT,
     DEFAULT_SLAVE,
     DOMAIN,
+    MAX_BATTERY_COUNT,
     MODBUS_RETRY_COUNT,
 )
 from .modbus_client import AtmoceModbusClient
@@ -64,6 +67,9 @@ STEP_BATTERY_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_BATTERY_MODEL, default="MS-7K-U"): vol.In(
             {k: v["label"] for k, v in BATTERY_MODELS.items()}
+        ),
+        vol.Required(CONF_BATTERY_COUNT, default=DEFAULT_BATTERY_COUNT): vol.All(
+            int, vol.Range(min=1, max=MAX_BATTERY_COUNT)
         ),
     }
 )
@@ -111,6 +117,29 @@ STEP_FALLBACK_SCHEMA = vol.Schema(
         ),
     }
 )
+
+
+# BATTERY_MODELS carries a "manual" placeholder whose specs are all None; it is
+# a routing choice in the setup wizard, not something that can be multiplied.
+CATALOGUE_MODELS = {
+    k: v for k, v in BATTERY_MODELS.items() if v["capacity_kwh"] is not None
+}
+
+
+def _specs_for(model_key: str, count: int) -> dict[str, Any]:
+    """Return the config keys for `count` stacked units of `model_key`.
+
+    Capacity and power scale with the number of units. Rounded because floats
+    like 3.75 * 3 land on values such as 11.249999999999998.
+    """
+    model = BATTERY_MODELS[model_key]
+    return {
+        CONF_BATTERY_MODEL: model_key,
+        CONF_BATTERY_COUNT: count,
+        CONF_CAPACITY_KWH: round(model["capacity_kwh"] * count, 2),
+        CONF_CHARGE_KW: round(model["charge_kw"] * count, 2),
+        CONF_DISCHARGE_KW: round(model["discharge_kw"] * count, 2),
+    }
 
 
 class AtmoceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -165,10 +194,12 @@ class AtmoceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if user_input[CONF_BATTERY_MODEL] == "manual":
                 return await self.async_step_manual_battery()
             # Pre-fill specs from catalogue
-            model = BATTERY_MODELS[user_input[CONF_BATTERY_MODEL]]
-            self._data[CONF_CAPACITY_KWH] = model["capacity_kwh"]
-            self._data[CONF_CHARGE_KW] = model["charge_kw"]
-            self._data[CONF_DISCHARGE_KW] = model["discharge_kw"]
+            self._data.update(
+                _specs_for(
+                    user_input[CONF_BATTERY_MODEL],
+                    user_input.get(CONF_BATTERY_COUNT, DEFAULT_BATTERY_COUNT),
+                )
+            )
             return await self.async_step_cloud()
 
         return self.async_show_form(
@@ -228,6 +259,49 @@ class AtmoceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=STEP_FALLBACK_SCHEMA,
             errors=errors,
         )
+
+    # ── Reconfigure (batteries added or removed) ─────────────────────────────
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Re-state the battery stack without deleting the integration.
+
+        Capacity and power limits are fixed at setup and feed the autonomy
+        sensor and the forced-power sliders, so adding a second battery used to
+        mean removing and re-adding the entry.
+        """
+        entry = self._get_reconfigure_entry()
+
+        if user_input is not None:
+            return self.async_update_reload_and_abort(
+                entry,
+                data_updates=_specs_for(
+                    user_input[CONF_BATTERY_MODEL],
+                    user_input[CONF_BATTERY_COUNT],
+                ),
+            )
+
+        stored_model = entry.data.get(CONF_BATTERY_MODEL)
+        schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_BATTERY_MODEL,
+                    # An entry set up with manual specs has no catalogue model to
+                    # fall back on, so offer the default rather than "manual",
+                    # whose specs are None and cannot be scaled.
+                    default=(
+                        stored_model
+                        if stored_model in CATALOGUE_MODELS
+                        else "MS-7K-U"
+                    ),
+                ): vol.In({k: v["label"] for k, v in CATALOGUE_MODELS.items()}),
+                vol.Required(
+                    CONF_BATTERY_COUNT,
+                    default=entry.data.get(CONF_BATTERY_COUNT, DEFAULT_BATTERY_COUNT),
+                ): vol.All(int, vol.Range(min=1, max=MAX_BATTERY_COUNT)),
+            }
+        )
+        return self.async_show_form(step_id="reconfigure", data_schema=schema)
 
     # ── Reauth (IP changed) ──────────────────────────────────────────────────
     async def async_step_reauth(

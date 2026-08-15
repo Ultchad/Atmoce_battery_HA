@@ -15,9 +15,13 @@
       },
       "battery": {
         "title": "Battery model",
-        "description": "Select your battery model. This sets the correct power limits.",
+        "description": "Select your battery model and how many units are installed. This sets the usable capacity and the power limits.",
         "data": {
-          "battery_model": "Model"
+          "battery_model": "Model",
+          "battery_count": "Number of batteries"
+        },
+        "data_description": {
+          "battery_count": "Stacked units of the same model. Capacity and power are multiplied by this number. If your inverter caps the total power below that, choose Manual specs instead and enter the real totals."
         }
       },
       "manual_battery": {
@@ -63,6 +67,17 @@
           "host": "New IP address",
           "port": "Modbus TCP port"
         }
+      },
+      "reconfigure": {
+        "title": "Battery stack",
+        "description": "Use this after adding or removing a battery. Capacity and power limits are set once at setup and feed the autonomy sensor and the forced-power sliders, so they need restating when the stack changes.\n\nNothing else is touched: your gateway, credentials and entity history all stay as they are.",
+        "data": {
+          "battery_model": "Model",
+          "battery_count": "Number of batteries"
+        },
+        "data_description": {
+          "battery_count": "Stacked units of the same model. Capacity and power are multiplied by this number."
+        }
       }
     },
     "error": {
@@ -71,7 +86,8 @@
     },
     "abort": {
       "already_configured": "This gateway is already configured.",
-      "reauth_successful": "Re-authentication successful."
+      "reauth_successful": "Re-authentication successful.",
+      "reconfigure_successful": "Battery stack updated."
     }
   },
   "options": {

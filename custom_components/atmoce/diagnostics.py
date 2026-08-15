@@ -43,6 +43,7 @@ async def async_get_config_entry_diagnostics(
             "firmware_version": coordinator.firmware_version,
             "hw_version": coordinator.hw_version,
             "battery_model": coordinator.battery_model,
+            "battery_count": coordinator.battery_count,
             "capacity_kwh": coordinator.capacity_kwh,
             "max_charge_kw": coordinator.max_charge_kw,
             "max_discharge_kw": coordinator.max_discharge_kw,

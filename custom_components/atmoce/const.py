@@ -118,6 +118,7 @@ CONF_HOST             = "host"
 CONF_PORT             = "port"
 CONF_SLAVE            = "slave"
 CONF_BATTERY_MODEL    = "battery_model"
+CONF_BATTERY_COUNT    = "battery_count"   # stacked units of the same model
 CONF_CAPACITY_KWH     = "capacity_kwh"
 CONF_CHARGE_KW        = "charge_kw"
 CONF_DISCHARGE_KW     = "discharge_kw"
@@ -127,6 +128,13 @@ CONF_CLOUD_APP_SECRET = "cloud_app_secret"
 CONF_CLOUD_WEB_EMAIL    = "cloud_web_email"     # atmocecloud.com login (for SOC limits)
 CONF_CLOUD_WEB_PASSWORD = "cloud_web_password"
 CONF_RETRY_COUNT      = "modbus_retry_count"
+
+# Stacked batteries of the same model. Capacity adds up unit by unit; the power
+# figures are multiplied too, which assumes the gateway is not the limiting
+# factor. Anyone whose inverter caps total power can enter the real totals with
+# the manual battery option instead.
+DEFAULT_BATTERY_COUNT = 1
+MAX_BATTERY_COUNT     = 16
 
 # Credentials live in entry.data only. The options flow edits them in place there
 # instead of writing a second copy into entry.options, so a secret is never

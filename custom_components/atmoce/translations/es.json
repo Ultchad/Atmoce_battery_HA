@@ -15,9 +15,13 @@
       },
       "battery": {
         "title": "Modelo de batería",
-        "description": "Selecciona tu modelo de batería. Esto configura los límites de potencia correctos.",
+        "description": "Selecciona tu modelo de batería y cuántas unidades tienes instaladas. Con eso se calculan la capacidad útil y los límites de potencia.",
         "data": {
-          "battery_model": "Modelo"
+          "battery_model": "Modelo",
+          "battery_count": "Número de baterías"
+        },
+        "data_description": {
+          "battery_count": "Unidades apiladas del mismo modelo. La capacidad y la potencia se multiplican por este número. Si tu inversor limita la potencia total por debajo de eso, elige Especificaciones manuales e introduce los totales reales."
         }
       },
       "manual_battery": {
@@ -63,8 +67,18 @@
           "host": "Host",
           "port": "Puerto"
         }
+      },
+      "reconfigure": {
+        "title": "Baterías instaladas",
+        "description": "Usa esto cuando añadas o quites una batería. La capacidad y los límites de potencia se fijan al configurar la integración y alimentan el sensor de autonomía y los deslizadores de potencia forzada, así que hay que actualizarlos si cambia el número de unidades.\n\nNo se toca nada más: el gateway, las credenciales y el histórico de las entidades se mantienen tal cual.",
+        "data": {
+          "battery_model": "Modelo",
+          "battery_count": "Número de baterías"
+        },
+        "data_description": {
+          "battery_count": "Unidades apiladas del mismo modelo. La capacidad y la potencia se multiplican por este número."
+        }
       }
-
     },
     "error": {
       "cannot_connect": "No se puede conectar al gateway Atmoce. Comprueba la dirección IP y que Modbus TCP esté habilitado.",
@@ -72,7 +86,8 @@
     },
     "abort": {
       "already_configured": "Este gateway ya está configurado.",
-      "reauth_successful": "Reautenticación correcta."
+      "reauth_successful": "Reautenticación correcta.",
+      "reconfigure_successful": "Baterías actualizadas."
     }
   },
   "options": {

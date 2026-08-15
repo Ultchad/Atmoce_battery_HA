@@ -5,6 +5,7 @@ import pytest
 
 from custom_components.atmoce.config_flow import AtmoceConfigFlow
 from custom_components.atmoce.const import (
+    CONF_BATTERY_COUNT,
     CONF_BATTERY_MODEL,
     CONF_CAPACITY_KWH,
     CONF_CHARGE_KW,
@@ -158,6 +159,131 @@ class TestCloudLoginStep:
 
         fields = {str(k) for k in STEP_CLOUD_SCHEMA.schema}
         assert fields == {CONF_CLOUD_WEB_EMAIL, CONF_CLOUD_WEB_PASSWORD}
+
+
+class TestBatteryCount:
+    """Stacked batteries scale capacity and power."""
+
+    def _make_flow(self):
+        flow = AtmoceConfigFlow()
+        flow._data = {CONF_HOST: "192.168.1.100"}
+        flow.hass = MagicMock()
+        flow.context = {}
+        flow.async_show_form = MagicMock(return_value={"type": "form"})
+        flow.async_step_cloud = AsyncMock(return_value={"type": "form"})
+        return flow
+
+    @pytest.mark.asyncio
+    async def test_single_battery_matches_the_catalogue(self):
+        flow = self._make_flow()
+        await flow.async_step_battery({
+            CONF_BATTERY_MODEL: "MS-7K-U",
+            CONF_BATTERY_COUNT: 1,
+        })
+
+        assert flow._data[CONF_CAPACITY_KWH] == 7.0
+        assert flow._data[CONF_CHARGE_KW] == 3.75
+        assert flow._data[CONF_DISCHARGE_KW] == 4.5
+
+    @pytest.mark.asyncio
+    async def test_two_batteries_double_capacity_and_power(self):
+        flow = self._make_flow()
+        await flow.async_step_battery({
+            CONF_BATTERY_MODEL: "MS-7K-U",
+            CONF_BATTERY_COUNT: 2,
+        })
+
+        assert flow._data[CONF_CAPACITY_KWH] == 14.0
+        assert flow._data[CONF_CHARGE_KW] == 7.5
+        assert flow._data[CONF_DISCHARGE_KW] == 9.0
+        assert flow._data[CONF_BATTERY_COUNT] == 2
+
+    def test_three_batteries_avoid_float_drift(self):
+        """3 * 3.75 must not land on 11.249999999999998."""
+        from custom_components.atmoce.config_flow import _specs_for
+
+        specs = _specs_for("MS-7K-U", 3)
+        assert specs[CONF_CHARGE_KW] == 11.25
+        assert specs[CONF_CAPACITY_KWH] == 21.0
+
+
+class TestReconfigure:
+    """Adding a battery must not require deleting the integration."""
+
+    def _make_flow(self, entry_data):
+        flow = AtmoceConfigFlow()
+        flow.hass = MagicMock()
+        flow.context = {}
+        entry = MagicMock()
+        entry.data = entry_data
+        flow._get_reconfigure_entry = MagicMock(return_value=entry)
+        flow.async_show_form = MagicMock(return_value={"type": "form"})
+        flow.async_update_reload_and_abort = MagicMock(
+            return_value={"type": "abort"}
+        )
+        return flow, entry
+
+    @pytest.mark.asyncio
+    async def test_submitting_rewrites_the_specs(self):
+        flow, entry = self._make_flow({
+            CONF_BATTERY_MODEL: "MS-7K-U",
+            CONF_BATTERY_COUNT: 1,
+            CONF_CAPACITY_KWH: 7.0,
+        })
+
+        await flow.async_step_reconfigure({
+            CONF_BATTERY_MODEL: "MS-7K-U",
+            CONF_BATTERY_COUNT: 2,
+        })
+
+        _, kwargs = flow.async_update_reload_and_abort.call_args
+        assert kwargs["data_updates"][CONF_CAPACITY_KWH] == 14.0
+        assert kwargs["data_updates"][CONF_CHARGE_KW] == 7.5
+        assert kwargs["data_updates"][CONF_BATTERY_COUNT] == 2
+
+    @pytest.mark.asyncio
+    async def test_form_prefills_the_stored_count(self):
+        flow, _ = self._make_flow({
+            CONF_BATTERY_MODEL: "MS-7K-U",
+            CONF_BATTERY_COUNT: 3,
+        })
+
+        await flow.async_step_reconfigure(None)
+
+        _, kwargs = flow.async_show_form.call_args
+        defaults = {
+            str(k): k.default() for k in kwargs["data_schema"].schema
+        }
+        assert defaults[CONF_BATTERY_COUNT] == 3
+
+    @pytest.mark.asyncio
+    async def test_manual_entry_does_not_break_the_form(self):
+        """A manually specified entry has no catalogue model to pre-select."""
+        flow, _ = self._make_flow({CONF_BATTERY_MODEL: "manual"})
+
+        await flow.async_step_reconfigure(None)
+
+        _, kwargs = flow.async_show_form.call_args
+        defaults = {
+            str(k): k.default() for k in kwargs["data_schema"].schema
+        }
+        assert defaults[CONF_BATTERY_MODEL] == "MS-7K-U"
+
+    @pytest.mark.asyncio
+    async def test_manual_is_not_offered_as_a_choice(self):
+        """"manual" has None specs — scaling it would raise TypeError."""
+        flow, _ = self._make_flow({CONF_BATTERY_MODEL: "MS-7K-U"})
+
+        await flow.async_step_reconfigure(None)
+
+        _, kwargs = flow.async_show_form.call_args
+        model_field = next(
+            k for k in kwargs["data_schema"].schema
+            if str(k) == CONF_BATTERY_MODEL
+        )
+        choices = kwargs["data_schema"].schema[model_field].container
+        assert "manual" not in choices
+        assert "MS-7K-U" in choices
 
 
 class TestGatewayStepConnectivity:

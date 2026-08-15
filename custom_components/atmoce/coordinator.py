@@ -15,6 +15,7 @@ from pymodbus.exceptions import ModbusException
 
 from .cloud_client import AtmoceCloudClient, AtmoceCloudError
 from .const import (
+    CONF_BATTERY_COUNT,
     CONF_BATTERY_MODEL,
     CONF_CAPACITY_KWH,
     CONF_CHARGE_KW,
@@ -83,6 +84,7 @@ class AtmoceCoordinator(DataUpdateCoordinator):
 
         # Battery specs (from catalogue or manual)
         self.battery_model: str = cfg.get(CONF_BATTERY_MODEL, "manual")
+        self.battery_count: int = cfg.get(CONF_BATTERY_COUNT, 1)
         self.capacity_kwh: float = cfg.get(CONF_CAPACITY_KWH, 7.0)
         self.max_charge_kw: float = cfg.get(CONF_CHARGE_KW, 3.75)
         self.max_discharge_kw: float = cfg.get(CONF_DISCHARGE_KW, 4.5)

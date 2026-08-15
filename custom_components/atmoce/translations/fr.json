@@ -15,9 +15,13 @@
       },
       "battery": {
         "title": "Modèle de batterie",
-        "description": "Sélectionnez votre modèle de batterie. Cela configure les limites de puissance appropriées.",
+        "description": "Sélectionnez votre modèle de batterie et le nombre d'unités installées. Cela détermine la capacité utile et les limites de puissance.",
         "data": {
-          "battery_model": "Modèle"
+          "battery_model": "Modèle",
+          "battery_count": "Nombre de batteries"
+        },
+        "data_description": {
+          "battery_count": "Unités empilées du même modèle. La capacité et la puissance sont multipliées par ce nombre. Si votre onduleur plafonne la puissance totale en dessous, choisissez plutôt les spécifications manuelles et saisissez les totaux réels."
         }
       },
       "manual_battery": {
@@ -63,8 +67,18 @@
           "host": "Hôte",
           "port": "Port"
         }
+      },
+      "reconfigure": {
+        "title": "Batteries installées",
+        "description": "À utiliser après avoir ajouté ou retiré une batterie. La capacité et les limites de puissance sont définies une seule fois lors de la configuration et alimentent le capteur d'autonomie ainsi que les curseurs de puissance forcée : il faut donc les mettre à jour quand le nombre d'unités change.\n\nRien d'autre n'est modifié : la passerelle, les identifiants et l'historique des entités restent intacts.",
+        "data": {
+          "battery_model": "Modèle",
+          "battery_count": "Nombre de batteries"
+        },
+        "data_description": {
+          "battery_count": "Unités empilées du même modèle. La capacité et la puissance sont multipliées par ce nombre."
+        }
       }
-
     },
     "error": {
       "cannot_connect": "Impossible de se connecter à la passerelle Atmoce. Vérifiez l'adresse IP et que Modbus TCP est activé.",
@@ -72,7 +86,8 @@
     },
     "abort": {
       "already_configured": "Cette passerelle est déjà configurée.",
-      "reauth_successful": "Réauthentification réussie."
+      "reauth_successful": "Réauthentification réussie.",
+      "reconfigure_successful": "Batteries mises à jour."
     }
   },
   "options": {
