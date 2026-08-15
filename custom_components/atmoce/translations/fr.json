@@ -30,15 +30,31 @@
         }
       },
       "cloud": {
-        "title": "Atmoce Cloud (optionnel)",
-        "description": "Deux fonctionnalités optionnelles et indépendantes. Le fallback de supervision (app_key/app_secret) nécessite des clés Open API partenaire Atmoce. Les limites de batterie (charge/décharge/réserve de sécurité) nécessitent uniquement votre connexion habituelle à atmocecloud.com (email + mot de passe).",
+        "title": "Compte atmocecloud.com (optionnel)",
+        "description": "Saisissez **votre connexion habituelle à atmocecloud.com**, la même que dans l'application ATMOZEN.\n\nElle sert à piloter les **limites de batterie** : SOC de fin de charge, de fin de décharge et réserve de sécurité. Ces trois réglages n'existent pas en Modbus, c'est donc la seule voie pour les modifier depuis Home Assistant.\n\nSi vous laissez les champs vides, tout le reste fonctionne normalement, mais ces trois commandes apparaîtront comme indisponibles.",
+        "data": {
+          "cloud_web_email": "Email atmocecloud.com",
+          "cloud_web_password": "Mot de passe atmocecloud.com"
+        },
+        "data_description": {
+          "cloud_web_email": "L'email avec lequel vous vous connectez à atmocecloud.com ou à l'application ATMOZEN.",
+          "cloud_web_password": "Le mot de passe de ce même compte. Il est stocké dans votre Home Assistant et n'apparaît jamais dans les diagnostics."
+        }
+      },
+      "fallback": {
+        "title": "Fallback de supervision Cloud (avancé)",
+        "description": "**Presque personne n'a besoin de cette étape : cliquez sur Envoyer et c'est tout.**\n\nElle ne couvre qu'un cas rare : la passerelle cesse de répondre en Modbus sur le réseau local. Si cela arrive et que vous activez cette option, l'intégration continuerait à lire les données via l'Open API d'Atmoce pendant la panne. C'est uniquement de la supervision de secours, cela n'ajoute aucune commande.\n\nElle nécessite `app_key` et `app_secret`, qui **ne sont pas fournis avec votre matériel et ne peuvent être générés depuis aucun site**. D'après le manuel de l'Open API (§3.1.2), c'est l'installateur qui les demande par email au support Atmoce, en indiquant le nom de l'installateur, le nom et la description du système, et en acceptant la licence de l'API. Elles sont destinées aux installateurs et intégrateurs gérant plusieurs installations.\n\nSi vous ne les avez pas, laissez l'interrupteur désactivé et les champs vides.",
         "data": {
           "cloud_enabled": "Activer le fallback de supervision Cloud",
-          "cloud_app_key": "API app_key (Open API, optionnel)",
-          "cloud_app_secret": "API app_secret (Open API, optionnel)",
-          "cloud_web_email": "Email atmocecloud.com (pour les limites de batterie)",
-          "cloud_web_password": "Mot de passe atmocecloud.com",
+          "cloud_app_key": "API app_key (Open API)",
+          "cloud_app_secret": "API app_secret (Open API)",
           "modbus_retry_count": "Échecs Modbus avant bascule vers Cloud"
+        },
+        "data_description": {
+          "cloud_enabled": "Ne l'activez que si le support Atmoce vous a fourni app_key et app_secret ; sans elles, le formulaire ne vous laissera pas continuer.",
+          "cloud_app_key": "Fournie par le support Atmoce. Ce n'est pas votre mot de passe et elle ne se génère pas depuis le portail.",
+          "cloud_app_secret": "Fourni en même temps que l'app_key.",
+          "modbus_retry_count": "Nombre d'échecs Modbus consécutifs avant de basculer vers le Cloud."
         }
       },
       "reauth_confirm": {
@@ -63,6 +79,7 @@
     "step": {
       "init": {
         "title": "Options Atmoce",
+        "description": "Deux fonctionnalités indépendantes, avec des identifiants distincts.\n\n**Limites de batterie** (charge/décharge/réserve) : uniquement votre connexion atmocecloud.com, email et mot de passe.\n\n**Fallback de supervision** : `app_key` et `app_secret` de l'Open API, à demander au support Atmoce ; elles ne sont pas fournies avec le matériel. Si vous ne les avez pas, laissez ces champs vides et l'interrupteur désactivé.",
         "data": {
           "modbus_retry_count": "Échecs Modbus avant bascule vers Cloud",
           "cloud_enabled": "Activer le fallback de supervision Cloud",
@@ -70,6 +87,14 @@
           "cloud_app_secret": "API app_secret (Open API, optionnel)",
           "cloud_web_email": "Email atmocecloud.com (pour les limites de batterie)",
           "cloud_web_password": "Mot de passe atmocecloud.com"
+        },
+        "data_description": {
+          "modbus_retry_count": "Nombre d'échecs Modbus consécutifs avant de basculer vers le Cloud.",
+          "cloud_enabled": "Ne l'activez que si vous disposez d'app_key et app_secret.",
+          "cloud_app_key": "À demander au support Atmoce. Laissez vide si vous ne l'avez pas.",
+          "cloud_app_secret": "Fourni en même temps que l'app_key. Laissez vide si vous ne l'avez pas.",
+          "cloud_web_email": "L'email avec lequel vous vous connectez à atmocecloud.com ou à l'application ATMOZEN.",
+          "cloud_web_password": "Le mot de passe de ce même compte. Il est pré-rempli avec celui enregistré : si vous l'effacez, il sera également effacé de la configuration."
         }
       }
     },

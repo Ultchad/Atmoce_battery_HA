@@ -1,3 +1,10 @@
+# Local credentials — must never be committed to a public repo
+CLAVES DEFAULT/
+
+# Local session/working notes and per-machine settings
+CLAUDE.local.md
+.claude/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
