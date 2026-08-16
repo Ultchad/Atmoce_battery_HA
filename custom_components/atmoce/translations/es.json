@@ -192,6 +192,11 @@
         "name": "Errores de conexión"
       }
     },
+    "binary_sensor": {
+      "battery_problem": {
+        "name": "Problema de batería"
+      }
+    },
     "switch": {
       "remote_control": {
         "name": "Control remoto"

@@ -78,6 +78,7 @@ Still under testing with the **Atmoce MS-7K-U** (7 kWh LFP battery). Should be c
 | `sensor.atmoce_station_status` | — | normal / fault |
 | `sensor.atmoce_active_data_source` | — | Modbus / Cloud |
 | `sensor.atmoce_connection_errors` | — | Cumulative Modbus failures |
+| `binary_sensor.atmoce_battery_problem` | — | On if the battery looks stuck: charge pinned at zero while the panels are producing |
 
 
 ### Controls
