@@ -112,6 +112,64 @@ class TestChangeModel:
         assert change_body["workModel"] == "1"           # sent as string
 
     @pytest.mark.asyncio
+    async def test_every_field_read_goes_back(self):
+        """A real station carries far more than the SOC limits.
+
+        Fields left out of the save are at the mercy of how the portal treats a
+        missing key, so a write must never narrow the object. This model is a
+        real diagnostics dump.
+        """
+        client = AtmoceWebClient("e", "p")
+        client._token = "T"
+
+        model = {
+            "stationId": 16078,
+            "workModel": 1,
+            "gridCharge": False,
+            "gridChargeMaxPower": 1000.0,
+            "storageGridChargeCutoffSoc": 100,
+            "storageChargeCutoffSoc": 100,
+            "storageDischargeCutoffSoc": 10,
+            "touTime": None,
+            "thirdApi": False,
+            "backupBoxExist": True,
+            "stormWatch": False,
+            "backupCapacity": 15,
+            "backupSoc": 15,
+            "peakShavingSoc": None,
+            "supportAi": False,
+            "workingStrategy": None,
+            "powerCap": None,
+            "storageSellToGridStatus": False,
+            "storageSellToGridMaxPower": 0.0,
+            "storageSellToGridUpSOC": 100,
+            "energyStoragePhaseControl": None,
+            "storageSellToGridMaxPowerLimitUp": 1000000,
+            "gridChargeMaxPowerLimitUp": 1000000,
+        }
+        session = _session([
+            _resp({"success": True, "data": model}),
+            _resp({"success": True, "data": 16078}),
+        ])
+
+        with patch("aiohttp.ClientSession", return_value=session):
+            await client.async_change_model(16078, {"backupSoc": 20})
+
+        body = session.post.call_args_list[1].kwargs["json"]
+
+        # Nothing the portal told us about may go missing.
+        assert set(body) == set(model)
+        # Including the settings the old hardcoded list dropped.
+        assert body["gridChargeMaxPower"] == 1000.0
+        assert body["storageGridChargeCutoffSoc"] == 100
+        assert body["storageSellToGridMaxPower"] == 0.0
+        assert body["storageSellToGridUpSOC"] == 100
+        assert body["backupCapacity"] == 15
+        # The requested change still lands, and workModel is still a string.
+        assert body["backupSoc"] == 20
+        assert body["workModel"] == "1"
+
+    @pytest.mark.asyncio
     async def test_change_model_raises_on_failure(self):
         client = AtmoceWebClient("e", "p")
         client._token = "T"

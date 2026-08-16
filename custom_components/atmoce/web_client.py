@@ -26,19 +26,17 @@ _STATION_LIST_URL = f"{CLOUD_WEB_BASE_URL}/energy-manage/multipleStation/getDrop
 _SELECT_MODEL_URL = f"{CLOUD_WEB_BASE_URL}/energy-manage/web/storageModel/selectModel"
 _CHANGE_MODEL_URL = f"{CLOUD_WEB_BASE_URL}/energy-manage/web/storageModel/changeModel"
 
-# changeModel is a read-modify-write of the whole storageModel object: these are
-# the fields the portal echoes back when saving.
-_MODEL_WRITE_FIELDS = (
-    "workModel",
-    "stormWatch",
-    "gridCharge",
-    "storageSellToGridStatus",
-    "energyStoragePhaseControl",
-    "storageChargeCutoffSoc",
-    "storageDischargeCutoffSoc",
-    "backupBoxExist",
-    "backupSoc",
-)
+# changeModel is a read-modify-write of the whole storageModel object, so every
+# field read has to go back. An earlier hardcoded list of nine covered barely
+# half of a real station: a diagnostics dump showed 23 fields, with the grid
+# charge power and cutoff, the sell-to-grid power and SOC, and touTime among the
+# ones being left out of every save. Echoing whatever the portal returned is
+# correct whichever way its backend treats a missing key, and if it ever objects
+# to a field the write fails loudly instead of quietly dropping a setting.
+#
+# stationId is set by the caller and workModel is submitted as a string, so both
+# are handled separately.
+_MODEL_ID_FIELD = "stationId"
 
 
 class AtmoceWebClient:
@@ -124,9 +122,8 @@ class AtmoceWebClient:
     ) -> None:
         """Apply updates to the storageModel (read-modify-write of the object)."""
         model = await self.async_read_model(station_id)
-        body: dict[str, Any] = {"stationId": station_id}
-        for field in _MODEL_WRITE_FIELDS:
-            body[field] = model.get(field)
+        body: dict[str, Any] = dict(model)
+        body[_MODEL_ID_FIELD] = station_id
         # The portal submits workModel as a string.
         if body.get("workModel") is not None:
             body["workModel"] = str(body["workModel"])
