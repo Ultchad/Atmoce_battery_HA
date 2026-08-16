@@ -260,6 +260,52 @@ class TestCloudFallbackErrorHandling:
             await coordinator._async_update_data()
 
 
+class TestStagedForcedParams:
+    """Parameters wait in Home Assistant until a forced command applies them."""
+
+    def test_staging_does_not_write_to_modbus(self, coordinator):
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator.stage_forced_param("forced_target_soc", 80)
+
+        assert coordinator.staged_params == {"forced_target_soc": 80}
+        coordinator._modbus.async_set_forced_target_soc.assert_not_called()
+
+    def test_staged_value_survives_a_poll(self, coordinator):
+        """The register still holds the old value, so a poll would undo it."""
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator.stage_forced_param("forced_target_soc", 80)
+
+        polled = coordinator._compute_derived({"forced_target_soc": 50})
+        polled.update(coordinator.staged_params)
+
+        assert polled["forced_target_soc"] == 80
+
+    @pytest.mark.asyncio
+    async def test_applying_writes_each_one_and_clears(self, coordinator):
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator.async_set_forced_target_soc = AsyncMock()
+        coordinator.async_set_forced_duration = AsyncMock()
+        coordinator.async_set_forced_power = AsyncMock()
+
+        coordinator.stage_forced_param("forced_target_soc", 80.0)
+        coordinator.stage_forced_param("forced_duration", 60.0)
+        coordinator.stage_forced_param("forced_power", 3.456)
+
+        await coordinator.async_apply_staged_params()
+
+        # Each register gets the type it expects.
+        coordinator.async_set_forced_target_soc.assert_awaited_once_with(80)
+        coordinator.async_set_forced_duration.assert_awaited_once_with(60)
+        coordinator.async_set_forced_power.assert_awaited_once_with(3.46)
+        # Cleared, so the next poll shows what the gateway actually holds.
+        assert coordinator.staged_params == {}
+
+    @pytest.mark.asyncio
+    async def test_applying_nothing_is_harmless(self, coordinator):
+        await coordinator.async_apply_staged_params()
+        assert coordinator.staged_params == {}
+
+
 def _web_enable(coordinator, client):
     """Configure a coordinator with a mocked web client and known station id."""
     coordinator._web_email = "me@example.com"

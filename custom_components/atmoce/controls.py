@@ -82,19 +82,6 @@ class AtmoceNumber(CoordinatorEntity[AtmoceCoordinator], NumberEntity):
         return self.coordinator.data.get(self._key)
 
     async def async_set_native_value(self, value: float) -> None:
-        """Take remote control, then write.
-
-        These are Modbus registers, and the gateway discards writes while in
-        local mode. Setting a parameter with the switch off used to be dropped
-        silently, and the forced command that followed then ran with whatever
-        the gateway already held — so the handover lives here, where no
-        subclass can forget it. Subclasses implement _async_write instead.
-
-        The write is unconditional rather than checking the last polled mode:
-        a stale readback would reintroduce exactly the bug this prevents, and
-        writing register 60301 again is harmless.
-        """
-        await self.coordinator.async_set_remote_control(True)
         await self._async_write(value)
         await self.coordinator.async_request_refresh()
 
@@ -103,7 +90,22 @@ class AtmoceNumber(CoordinatorEntity[AtmoceCoordinator], NumberEntity):
         raise NotImplementedError
 
 
-class AtmoceTargetSOC(AtmoceNumber):
+class AtmoceForcedParam(AtmoceNumber):
+    """A parameter of a forced charge or discharge, not a control of its own.
+
+    Nothing is written when you type one. The value is staged in Home
+    Assistant and the Battery Command select applies it when you actually ask
+    for a forced charge or discharge. Writing on the spot would mean either
+    losing it (the gateway discards writes in local mode) or taking remote
+    control, which would knock the battery out of self-consumption or TOU just
+    because a number was adjusted.
+    """
+
+    async def async_set_native_value(self, value: float) -> None:
+        self.coordinator.stage_forced_param(self._key, value)
+
+
+class AtmoceTargetSOC(AtmoceForcedParam):
     _attr_native_min_value = 0
     _attr_native_max_value = 100
     _attr_native_step = 1
@@ -113,11 +115,8 @@ class AtmoceTargetSOC(AtmoceNumber):
     def __init__(self, coordinator: AtmoceCoordinator) -> None:
         super().__init__(coordinator, "forced_target_soc", "Forced Target SOC")
 
-    async def _async_write(self, value: float) -> None:
-        await self.coordinator.async_set_forced_target_soc(int(value))
 
-
-class AtmoceForcedDuration(AtmoceNumber):
+class AtmoceForcedDuration(AtmoceForcedParam):
     _attr_native_min_value = 0
     _attr_native_max_value = 1440
     _attr_native_step = 1
@@ -127,11 +126,8 @@ class AtmoceForcedDuration(AtmoceNumber):
     def __init__(self, coordinator: AtmoceCoordinator) -> None:
         super().__init__(coordinator, "forced_duration", "Forced Duration")
 
-    async def _async_write(self, value: float) -> None:
-        await self.coordinator.async_set_forced_duration(int(value))
 
-
-class AtmoceForcedPower(AtmoceNumber):
+class AtmoceForcedPower(AtmoceForcedParam):
     _attr_native_min_value = 0
     _attr_native_step = 0.1
     _attr_native_unit_of_measurement = UnitOfPower.KILO_WATT
@@ -142,11 +138,17 @@ class AtmoceForcedPower(AtmoceNumber):
         # Max from battery catalogue
         self._attr_native_max_value = coordinator.max_charge_kw
 
-    async def _async_write(self, value: float) -> None:
-        await self.coordinator.async_set_forced_power(round(value, 2))
-
 
 class AtmoceDispatchPower(AtmoceNumber):
+    """Direct power setpoint — a command in its own right, not a parameter.
+
+    Unlike the forced-mode parameters this cannot be staged: there is no later
+    moment that would apply it, since the battery follows it only while under
+    remote control. So it is offered only when remote control is already on,
+    rather than grabbing it and pulling the battery out of self-managed
+    operation the moment someone nudges the value.
+    """
+
     _attr_native_step = 0.05
     _attr_native_unit_of_measurement = UnitOfPower.KILO_WATT
     _attr_icon = "mdi:battery-arrow-down-outline"
@@ -155,6 +157,10 @@ class AtmoceDispatchPower(AtmoceNumber):
         super().__init__(coordinator, "battery_dispatch_power", "Dispatch Power")
         self._attr_native_min_value = -coordinator.max_charge_kw
         self._attr_native_max_value = coordinator.max_discharge_kw
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.coordinator.data.get("comm_control_mode") == 1
 
     @property
     def native_value(self) -> float | None:
@@ -276,11 +282,14 @@ class AtmoceForcedCommandSelect(CoordinatorEntity[AtmoceCoordinator], SelectEnti
             await self.coordinator.async_set_forced_command(cmd)
             await self.coordinator.async_set_remote_control(False)
         else:
-            # The gateway ignores Modbus writes while in local mode, so a forced
-            # command sent with remote control off is silently discarded — the
-            # select would show the new option with nothing happening on the
-            # battery. Take remote control first, then give the order.
+            # This is where a forced charge or discharge actually begins, so it
+            # is where everything it needs comes together. The gateway ignores
+            # Modbus writes in local mode, so take control first; then push the
+            # parameters the owner has set, which have been waiting in Home
+            # Assistant precisely so that adjusting them did not disturb the
+            # battery; then give the order, which reads them.
             await self.coordinator.async_set_remote_control(True)
+            await self.coordinator.async_apply_staged_params()
             await self.coordinator.async_set_forced_command(cmd)
 
         await self.coordinator.async_request_refresh()

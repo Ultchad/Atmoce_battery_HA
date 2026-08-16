@@ -43,6 +43,8 @@ def _make_coordinator(data: dict = None, **kwargs):
     coord.async_set_forced_power = AsyncMock()
     coord.async_set_dispatch_power = AsyncMock()
     coord.async_reset_gateway = AsyncMock()
+    coord.stage_forced_param = MagicMock()
+    coord.async_apply_staged_params = AsyncMock()
     for k, v in kwargs.items():
         setattr(coord, k, v)
     return coord
@@ -112,7 +114,7 @@ class TestTargetSOC:
         entity = _make_entity(AtmoceTargetSOC, coord)
         entity._key = "forced_target_soc"
         await entity.async_set_native_value(80.0)
-        coord.async_set_forced_target_soc.assert_awaited_once_with(80)
+        coord.stage_forced_param.assert_called_once_with("forced_target_soc", 80.0)
 
 
 class TestForcedDuration:
@@ -122,7 +124,7 @@ class TestForcedDuration:
         entity = _make_entity(AtmoceForcedDuration, coord)
         entity._key = "forced_duration"
         await entity.async_set_native_value(120.0)
-        coord.async_set_forced_duration.assert_awaited_once_with(120)
+        coord.stage_forced_param.assert_called_once_with("forced_duration", 120.0)
 
 
 class TestForcedPower:
@@ -132,7 +134,7 @@ class TestForcedPower:
         entity = _make_entity(AtmoceForcedPower, coord)
         entity._key = "forced_power"
         await entity.async_set_native_value(3.5)
-        coord.async_set_forced_power.assert_awaited_once_with(3.5)
+        coord.stage_forced_param.assert_called_once_with("forced_power", 3.5)
 
 
 class TestDispatchPower:
@@ -157,57 +159,92 @@ class TestDispatchPower:
         coord.async_set_dispatch_power.assert_awaited_once_with(2500)
 
 
-class TestNumbersTakeRemoteControl:
-    """Modbus writes are discarded in local mode, so every number must take it.
+class TestForcedParamsAreStaged:
+    """Adjusting a forced-mode parameter must not disturb the battery.
 
-    Without this, setting a parameter with the switch off was dropped silently
-    and the forced command that followed ran with a stale value.
+    Writing one on the spot would either be discarded in local mode or force a
+    handover to remote control, which takes the battery out of self-consumption
+    or TOU because a number was nudged.
     """
 
     @pytest.mark.parametrize(
-        ("entity_cls", "key", "value", "method"),
+        ("entity_cls", "key", "value"),
         [
-            (AtmoceTargetSOC, "forced_target_soc", 80, "async_set_forced_target_soc"),
-            (AtmoceForcedDuration, "forced_duration", 60, "async_set_forced_duration"),
-            (AtmoceForcedPower, "forced_power", 3.5, "async_set_forced_power"),
-            (
-                AtmoceDispatchPower,
-                "battery_dispatch_power",
-                2.0,
-                "async_set_dispatch_power",
-            ),
+            (AtmoceTargetSOC, "forced_target_soc", 80),
+            (AtmoceForcedDuration, "forced_duration", 60),
+            (AtmoceForcedPower, "forced_power", 3.5),
         ],
     )
     @pytest.mark.asyncio
-    async def test_control_is_taken_before_the_write(
-        self, entity_cls, key, value, method
-    ):
+    async def test_setting_stages_and_writes_nothing(self, entity_cls, key, value):
         coord = _make_coordinator({key: 0, "comm_control_mode": 0})
         entity = _make_entity(entity_cls, coord)
         entity._key = key
+
+        await entity.async_set_native_value(value)
+
+        coord.stage_forced_param.assert_called_once_with(key, value)
+        coord.async_set_remote_control.assert_not_awaited()
+        coord.async_set_forced_target_soc.assert_not_awaited()
+        coord.async_set_forced_duration.assert_not_awaited()
+        coord.async_set_forced_power.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_forcing_applies_the_staged_values_before_the_command(self):
+        coord = _make_coordinator({"forced_cmd": FORCED_CMD_AUTO})
+        entity = _make_entity(AtmoceForcedCommandSelect, coord)
 
         calls = []
         coord.async_set_remote_control = AsyncMock(
             side_effect=lambda v: calls.append("remote")
         )
-        setattr(
-            coord, method, AsyncMock(side_effect=lambda v: calls.append("write"))
+        coord.async_apply_staged_params = AsyncMock(
+            side_effect=lambda: calls.append("params")
+        )
+        coord.async_set_forced_command = AsyncMock(
+            side_effect=lambda v: calls.append("cmd")
         )
 
-        await entity.async_set_native_value(value)
+        await entity.async_select_option("Forced charge")
 
-        assert calls == ["remote", "write"]
+        # Control, then the parameters the command reads, then the command.
+        assert calls == ["remote", "params", "cmd"]
 
     @pytest.mark.asyncio
-    async def test_control_is_taken_even_when_already_remote(self):
-        """A stale readback must not skip the handover."""
-        coord = _make_coordinator({"forced_target_soc": 50, "comm_control_mode": 1})
-        entity = _make_entity(AtmoceTargetSOC, coord)
+    async def test_battery_managed_applies_nothing(self):
+        """Releasing control must not push staged parameters on the way out."""
+        coord = _make_coordinator({"forced_cmd": FORCED_CMD_CHARGE})
+        entity = _make_entity(AtmoceForcedCommandSelect, coord)
 
-        await entity.async_set_native_value(80)
+        await entity.async_select_option("Battery managed")
 
-        coord.async_set_remote_control.assert_awaited_once_with(True)
+        coord.async_apply_staged_params.assert_not_awaited()
 
+
+class TestDispatchPower:
+    """A direct setpoint the battery only follows under remote control."""
+
+    @pytest.mark.asyncio
+    async def test_unavailable_while_the_battery_self_manages(self):
+        coord = _make_coordinator({"battery_dispatch_power": 0, "comm_control_mode": 0})
+        entity = _make_entity(AtmoceDispatchPower, coord)
+        entity._key = "battery_dispatch_power"
+
+        assert entity.available is False
+
+    @pytest.mark.asyncio
+    async def test_available_and_written_through_under_remote_control(self):
+        coord = _make_coordinator({"battery_dispatch_power": 0, "comm_control_mode": 1})
+        entity = _make_entity(AtmoceDispatchPower, coord)
+        entity._key = "battery_dispatch_power"
+
+        assert entity.available is True
+        await entity.async_set_native_value(2.0)
+        coord.async_set_dispatch_power.assert_awaited_once_with(2000)
+        coord.async_set_remote_control.assert_not_awaited()
+
+
+class TestCloudLimitsAreSeparate:
     @pytest.mark.asyncio
     async def test_cloud_soc_limits_do_not_touch_remote_control(self):
         """These go to the web portal — grabbing the gateway would be a no-op

@@ -83,11 +83,11 @@ Still under testing with the **Atmoce MS-7K-U** (7 kWh LFP battery). Should be c
 
 | Entity | Description |
 |--------|-------------|
-| `switch.atmoce_remote_control` | Enable/disable remote Modbus control — the battery ignores Modbus writes in local mode. You no longer need to turn it on by hand: every control below takes it first, and **Administrado por batería** releases it again. |
-| `number.atmoce_forced_target_soc` | Target SOC for forced charge/discharge (0–100 %) |
-| `number.atmoce_forced_duration` | Duration for forced operation (0–1440 min) |
-| `number.atmoce_forced_power` | Power for forced charge (0–max charge kW) |
-| `number.atmoce_dispatch_power` | Dispatch power setpoint in kW (negative = charge) |
+| `switch.atmoce_remote_control` | Enable/disable remote Modbus control — the battery ignores Modbus writes in local mode. Selecting a forced command turns it on for you, and **Administrado por batería** turns it back off. Turn it on by hand only to use dispatch power. |
+| `number.atmoce_forced_target_soc` | Target SOC for forced charge/discharge (0–100 %). Set it any time — it is applied when you pick a forced command |
+| `number.atmoce_forced_duration` | Duration for forced operation (0–1440 min). Applied with the forced command |
+| `number.atmoce_forced_power` | Power for forced charge (0–max charge kW). Applied with the forced command |
+| `number.atmoce_dispatch_power` | Dispatch power setpoint in kW (negative = charge). Only available while remote control is on, since the battery follows it only in that mode |
 | `select.atmoce_battery_command` | Carga forzada / Descarga forzada / Administrado por batería |
 | `select.atmoce_forced_mode_type` | SOC objetivo / Duración / SOC + Duración |
 | `button.atmoce_reset_gateway` | Reset the Atmoce gateway |
@@ -164,7 +164,10 @@ Make sure the gateway (MC100 / MG100) has Modbus TCP enabled on port 502. This i
 Reload the integration from Settings → Devices & Services → Atmoce Battery → ⋮ → Reload. If the problem persists, restart Home Assistant.
 
 **The battery commands have no effect.**
-The battery ignores Modbus writes while in local mode, so `switch.atmoce_remote_control` must be ON for anything to land. Since v1.3.4 you do not have to think about it: setting any number, or picking **Forced charge** / **Forced discharge**, takes remote control first, and **Administrado por batería** releases it. On older versions, turn the switch on before sending anything — and note that a parameter set while in local mode was discarded, so a forced command issued afterwards ran with whatever value the gateway still held.
+The battery ignores Modbus writes while in local mode, so `switch.atmoce_remote_control` must be ON for anything to land. Since v1.3.5 this is handled for you: target SOC, duration and forced power are held in Home Assistant and written when you pick **Carga forzada** or **Descarga forzada**, which takes remote control first. Set them in any order, before or after; adjusting one never disturbs a self-managing battery. On older versions, turn the switch on by hand before sending anything.
+
+**I set a target SOC but the battery kept doing its own thing.**
+That is intended. The three forced-mode parameters do nothing on their own — they describe *how* a forced charge or discharge should run. Nothing happens until you select one in `select.atmoce_battery_command`.
 
 **Sensors show "unavailable" after a few hours.**
 The gateway has stopped answering over Modbus. The Cloud fallback covers this, but it needs partner Open API keys (`app_key` / `app_secret`) that do not ship with the hardware — per the Open API manual §3.1.2 the installer requests them by email from Atmoce support. Without them, check the gateway's network connection instead; the fallback cannot be enabled.

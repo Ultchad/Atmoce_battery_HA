@@ -55,6 +55,14 @@ CLOUD_FETCH_ERRORS = (
 
 _LOGGER = logging.getLogger(__name__)
 
+# How each staged forced-mode parameter reaches the gateway, keyed by the same
+# data key the number entities read back.
+_STAGED_WRITERS = {
+    "forced_target_soc": lambda c, v: c.async_set_forced_target_soc(int(v)),
+    "forced_duration": lambda c, v: c.async_set_forced_duration(int(v)),
+    "forced_power": lambda c, v: c.async_set_forced_power(round(v, 2)),
+}
+
 # Rolling window for autonomy calculation (last N data points ≈ last 2h at 10s)
 _CONSUMPTION_WINDOW = 720
 
@@ -112,6 +120,10 @@ class AtmoceCoordinator(DataUpdateCoordinator):
         self._station_id: int | None = None
         # SOC limits, kept across Modbus polls (Modbus can't provide them)
         self._web_params: dict[str, Any] = {}
+        # Forced-mode parameters held in Home Assistant until a forced command
+        # applies them. See stage_forced_param for why they are not written
+        # straight away.
+        self._staged_params: dict[str, float] = {}
 
         # State tracking
         self._modbus_failures: int = 0
@@ -184,6 +196,10 @@ class AtmoceCoordinator(DataUpdateCoordinator):
         # Re-inject the web-portal SOC limits (Modbus polls never carry these keys).
         raw.update(self._web_params)
 
+        # Staged parameters have not reached the gateway yet, so the poll would
+        # otherwise overwrite what the owner just typed with the old register.
+        raw.update(self._staged_params)
+
         return raw
 
     # ── Modbus fetch ──────────────────────────────────────────────────────────
@@ -255,6 +271,32 @@ class AtmoceCoordinator(DataUpdateCoordinator):
         data["battery_healthy"] = not (soc == 0 and pv_power > 100)
 
         return data
+
+    # ── Forced-mode parameters ────────────────────────────────────────────────
+    def stage_forced_param(self, key: str, value: float) -> None:
+        """Hold a forced-mode parameter until a forced command is issued.
+
+        These three registers only mean anything to a forced charge or
+        discharge, and the gateway discards writes while in local mode. Writing
+        one immediately would therefore either be lost, or force a handover to
+        remote control — which drops the battery out of self-consumption or TOU
+        for what the owner meant as a settings change. Staging keeps the value
+        visible in Home Assistant and costs the battery nothing.
+        """
+        self._staged_params[key] = value
+        if self.data is not None:
+            self.async_set_updated_data({**self.data, **self._staged_params})
+
+    @property
+    def staged_params(self) -> dict[str, float]:
+        """Parameters typed in Home Assistant but not yet on the gateway."""
+        return dict(self._staged_params)
+
+    async def async_apply_staged_params(self) -> None:
+        """Write the staged parameters. The caller must hold remote control."""
+        for key, value in list(self._staged_params.items()):
+            await _STAGED_WRITERS[key](self, value)
+        self._staged_params.clear()
 
     # ── Control proxy methods (delegate to Modbus) ────────────────────────────
     async def async_set_remote_control(self, enabled: bool) -> None:
