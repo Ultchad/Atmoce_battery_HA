@@ -16,10 +16,9 @@ Still under testing with the **Atmoce MS-7K-U** (7 kWh LFP battery). Should be c
 ## Features
 
 - **27 sensor entities** — grid, PV, battery, system and computed metrics
-- **Full battery control** — force charge/discharge, set target SOC, duration and power
-- **"Administrado por batería" mode** — one selection returns the battery to automatic self-managed mode (also drops out of remote control)
+- **Full battery control** — force charge/discharge, set target SOC (Requires cloud user and password for this function), duration and power or just let the battery manage itself. 
 - **Battery count** in setup — say how many MS-7K-U units you have and the capacity and power limits follow; changeable later via **Reconfigure**, with manual entry for other hardware
-- **Automatic Modbus→Cloud fallback** (optional) if the gateway is temporarily unreachable
+- **Automatic Modbus→Cloud fallback** (optional) if the gateway is temporarily unreachable, although a very rare case (and requires ATMOCE to hand you API credentials)
 - **Active data source sensor** — always know whether you are reading Modbus or Cloud
 - **Computed sensors** — autonomy hours, PV self-consumption rate, battery health
 - **Diagnostics support** — exportable debug info with sensitive fields redacted
@@ -84,12 +83,11 @@ Still under testing with the **Atmoce MS-7K-U** (7 kWh LFP battery). Should be c
 
 | Entity | Description |
 |--------|-------------|
-| `switch.atmoce_remote_control` | Enable/disable remote Modbus control. **Must be ON before sending commands.** |
 | `number.atmoce_forced_target_soc` | Target SOC for forced charge/discharge (0–100 %) |
 | `number.atmoce_forced_duration` | Duration for forced operation (0–1440 min) |
 | `number.atmoce_forced_power` | Power for forced charge (0–max charge kW) |
 | `number.atmoce_dispatch_power` | Dispatch power setpoint in kW (negative = charge) |
-| `select.atmoce_battery_command` | Carga forzada / Descarga forzada / Administrado por batería (this last option also turns Remote Control off) |
+| `select.atmoce_battery_command` | Carga forzada / Descarga forzada / Administrado por batería |
 | `select.atmoce_forced_mode_type` | SOC objetivo / Duración / SOC + Duración |
 | `button.atmoce_reset_gateway` | Reset the Atmoce gateway |
 
