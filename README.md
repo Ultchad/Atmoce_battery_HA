@@ -165,7 +165,7 @@ Make sure the gateway (MC100 / MG100) has Modbus TCP enabled on port 502. This i
 Reload the integration from Settings → Devices & Services → Atmoce Battery → ⋮ → Reload. If the problem persists, restart Home Assistant.
 
 **The battery commands have no effect.**
-The `switch.atmoce_remote_control` must be turned **ON** before sending any charge/discharge command. The battery ignores Modbus write commands when in local mode.
+The battery ignores Modbus writes while in local mode, so `switch.atmoce_remote_control` must be **ON** for any command to land. Picking **Forced charge** or **Forced discharge** in the Battery Command select now takes remote control for you; **Battery managed** releases it again. The number entities — target SOC, duration, forced power, dispatch power — do not, so turn the switch on before setting those.
 
 **Sensors show "unavailable" after a few hours.**
 The gateway has stopped answering over Modbus. The Cloud fallback covers this, but it needs partner Open API keys (`app_key` / `app_secret`) that do not ship with the hardware — per the Open API manual §3.1.2 the installer requests them by email from Atmoce support. Without them, check the gateway's network connection instead; the fallback cannot be enabled.

@@ -248,11 +248,21 @@ class AtmoceForcedCommandSelect(CoordinatorEntity[AtmoceCoordinator], SelectEnti
 
     async def async_select_option(self, option: str) -> None:
         cmd = self._OPTION_TO_CMD[option]
-        await self.coordinator.async_set_forced_command(cmd)
-        # "Battery managed" hands full control back to the battery: besides exiting
-        # forced mode, drop out of remote control so it self-manages (self-use/TOU).
+
         if cmd == FORCED_CMD_AUTO:
+            # "Battery managed" hands full control back to the battery: besides
+            # exiting forced mode, drop out of remote control so it self-manages
+            # (self-use/TOU).
+            await self.coordinator.async_set_forced_command(cmd)
             await self.coordinator.async_set_remote_control(False)
+        else:
+            # The gateway ignores Modbus writes while in local mode, so a forced
+            # command sent with remote control off is silently discarded — the
+            # select would show the new option with nothing happening on the
+            # battery. Take remote control first, then give the order.
+            await self.coordinator.async_set_remote_control(True)
+            await self.coordinator.async_set_forced_command(cmd)
+
         await self.coordinator.async_request_refresh()
 
 

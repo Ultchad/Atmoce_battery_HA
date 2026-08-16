@@ -177,13 +177,33 @@ class TestForcedCommandSelect:
         assert self._entity(None).current_option is None
 
     @pytest.mark.asyncio
-    async def test_select_charge(self):
+    async def test_select_charge_takes_remote_control_first(self):
+        """A forced command in local mode is silently ignored by the gateway."""
         coord = _make_coordinator({"forced_cmd": FORCED_CMD_AUTO})
         entity = _make_entity(AtmoceForcedCommandSelect, coord)
+
+        calls = []
+        coord.async_set_remote_control = AsyncMock(
+            side_effect=lambda v: calls.append(("remote", v))
+        )
+        coord.async_set_forced_command = AsyncMock(
+            side_effect=lambda v: calls.append(("cmd", v))
+        )
+
         await entity.async_select_option("Forced charge")
-        coord.async_set_forced_command.assert_awaited_once_with(FORCED_CMD_CHARGE)
-        # Only "Battery managed" touches remote control
-        coord.async_set_remote_control.assert_not_awaited()
+
+        # Order matters: the order is discarded if it arrives while still local.
+        assert calls == [("remote", True), ("cmd", FORCED_CMD_CHARGE)]
+
+    @pytest.mark.asyncio
+    async def test_select_discharge_takes_remote_control_first(self):
+        coord = _make_coordinator({"forced_cmd": FORCED_CMD_AUTO})
+        entity = _make_entity(AtmoceForcedCommandSelect, coord)
+
+        await entity.async_select_option("Forced discharge")
+
+        coord.async_set_remote_control.assert_awaited_once_with(True)
+        coord.async_set_forced_command.assert_awaited_once_with(FORCED_CMD_DISCHARGE)
 
     @pytest.mark.asyncio
     async def test_select_auto_also_disables_remote(self):
@@ -192,6 +212,24 @@ class TestForcedCommandSelect:
         await entity.async_select_option("Battery managed")
         coord.async_set_forced_command.assert_awaited_once_with(FORCED_CMD_AUTO)
         coord.async_set_remote_control.assert_awaited_once_with(False)
+
+    @pytest.mark.asyncio
+    async def test_auto_exits_forced_mode_before_releasing_control(self):
+        """Releasing remote control first would strand the forced command."""
+        coord = _make_coordinator({"forced_cmd": FORCED_CMD_CHARGE})
+        entity = _make_entity(AtmoceForcedCommandSelect, coord)
+
+        calls = []
+        coord.async_set_remote_control = AsyncMock(
+            side_effect=lambda v: calls.append(("remote", v))
+        )
+        coord.async_set_forced_command = AsyncMock(
+            side_effect=lambda v: calls.append(("cmd", v))
+        )
+
+        await entity.async_select_option("Battery managed")
+
+        assert calls == [("cmd", FORCED_CMD_AUTO), ("remote", False)]
 
 
 class TestForcedModeSelect:
