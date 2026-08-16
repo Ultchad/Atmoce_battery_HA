@@ -13,6 +13,7 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     PERCENTAGE,
+    EntityCategory,
     UnitOfElectricCurrent,
     UnitOfElectricPotential,
     UnitOfEnergy,
@@ -236,6 +237,8 @@ SENSOR_DESCRIPTIONS: tuple[AtmoceeSensorDescription, ...] = (
         data_key="active_source",
         name="Active Data Source",
         icon="mdi:connection",
+        # About the integration's health, not the energy system's behaviour.
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     AtmoceeSensorDescription(
         key="connection_errors",
@@ -243,6 +246,7 @@ SENSOR_DESCRIPTIONS: tuple[AtmoceeSensorDescription, ...] = (
         name="Connection Errors",
         state_class=SensorStateClass.TOTAL_INCREASING,
         icon="mdi:alert-network",
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
 )
 
@@ -271,6 +275,10 @@ class AtmoceSensor(CoordinatorEntity[AtmoceCoordinator], SensorEntity):
     ) -> None:
         super().__init__(coordinator)
         self.entity_description = description
+        # Every sensor key has a matching entry under `entity.sensor` in the
+        # translation files, so the name comes from there. The `name` on the
+        # description stays as the fallback for a key without a translation.
+        self._attr_translation_key = description.key
         self._attr_unique_id = f"{coordinator.serial_number}_{description.key}"
         self._attr_device_info = _device_info(coordinator)
 

@@ -116,5 +116,157 @@
     "error": {
       "cloud_credentials_required": "app_key et app_secret sont obligatoires lorsque le fallback Cloud est activé."
     }
+  },
+  "entity": {
+    "sensor": {
+      "grid_voltage": {
+        "name": "Tension du réseau"
+      },
+      "grid_current": {
+        "name": "Courant du réseau"
+      },
+      "grid_power": {
+        "name": "Puissance du réseau"
+      },
+      "grid_energy_daily": {
+        "name": "Énergie réseau aujourd'hui"
+      },
+      "grid_energy_total": {
+        "name": "Énergie réseau totale"
+      },
+      "elec_sales_daily": {
+        "name": "Électricité vendue aujourd'hui"
+      },
+      "elec_sales_total": {
+        "name": "Électricité vendue au total"
+      },
+      "pv_power": {
+        "name": "Puissance solaire"
+      },
+      "pv_energy_daily": {
+        "name": "Énergie solaire aujourd'hui"
+      },
+      "pv_energy_total": {
+        "name": "Énergie solaire totale"
+      },
+      "pv_self_consumption_rate": {
+        "name": "Autoconsommation solaire"
+      },
+      "battery_soc": {
+        "name": "Charge de la batterie"
+      },
+      "battery_power": {
+        "name": "Puissance de la batterie"
+      },
+      "battery_status": {
+        "name": "État de la batterie"
+      },
+      "battery_mode": {
+        "name": "Mode de fonctionnement"
+      },
+      "battery_dispatch_power": {
+        "name": "Lecture de la puissance de consigne"
+      },
+      "battery_charged_daily": {
+        "name": "Batterie chargée aujourd'hui"
+      },
+      "battery_discharged_daily": {
+        "name": "Batterie déchargée aujourd'hui"
+      },
+      "battery_charged_total": {
+        "name": "Batterie chargée au total"
+      },
+      "battery_discharged_total": {
+        "name": "Batterie déchargée au total"
+      },
+      "autonomy_hours": {
+        "name": "Autonomie"
+      },
+      "station_status": {
+        "name": "État de l'installation"
+      },
+      "active_source": {
+        "name": "Source de données active"
+      },
+      "connection_errors": {
+        "name": "Erreurs de connexion"
+      }
+    },
+    "switch": {
+      "remote_control": {
+        "name": "Contrôle à distance"
+      },
+      "grid_charge": {
+        "name": "Recharge depuis le réseau"
+      },
+      "sell_to_grid": {
+        "name": "Export vers le réseau"
+      }
+    },
+    "number": {
+      "forced_target_soc": {
+        "name": "Charge cible forcée"
+      },
+      "forced_duration": {
+        "name": "Durée forcée"
+      },
+      "forced_power": {
+        "name": "Puissance forcée"
+      },
+      "battery_dispatch_power": {
+        "name": "Puissance de consigne"
+      },
+      "end_of_charge_soc": {
+        "name": "Limite de charge"
+      },
+      "end_of_discharge_soc": {
+        "name": "Limite de décharge"
+      },
+      "battery_reserved_soc": {
+        "name": "Réserve de sécurité"
+      },
+      "grid_charge_max_power": {
+        "name": "Puissance de recharge réseau"
+      },
+      "grid_charge_cutoff_soc": {
+        "name": "Limite de recharge réseau"
+      },
+      "sell_to_grid_max_power": {
+        "name": "Puissance d'export"
+      },
+      "sell_to_grid_up_soc": {
+        "name": "Exporter au-dessus de"
+      }
+    },
+    "button": {
+      "reset_gateway": {
+        "name": "Redémarrer la passerelle"
+      }
+    },
+    "select": {
+      "battery_command": {
+        "name": "Commande de la batterie",
+        "state": {
+          "forced_charge": "Charge forcée",
+          "forced_discharge": "Décharge forcée",
+          "battery_managed": "Géré par la batterie"
+        }
+      },
+      "forced_mode_type": {
+        "name": "Type de mode forcé",
+        "state": {
+          "target_soc": "Charge cible",
+          "duration": "Durée",
+          "soc_duration": "Charge et durée"
+        }
+      },
+      "work_mode": {
+        "name": "Mode autogéré",
+        "state": {
+          "self_powered": "Énergie autonome",
+          "time_of_use": "Tarification horaire (TOU)"
+        }
+      }
+    }
   }
 }

@@ -8,7 +8,7 @@ from homeassistant.components.button import ButtonEntity
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.components.select import SelectEntity
 from homeassistant.components.switch import SwitchEntity
-from homeassistant.const import PERCENTAGE, UnitOfPower, UnitOfTime
+from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfPower, UnitOfTime
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
@@ -52,7 +52,7 @@ class AtmoceRemoteControlSwitch(CoordinatorEntity[AtmoceCoordinator], SwitchEnti
     """Switch to enable/disable remote Modbus control of the battery."""
 
     _attr_has_entity_name = True
-    _attr_name = "Remote Control"
+    _attr_translation_key = "remote_control"
     _attr_icon = "mdi:remote"
 
     def __init__(self, coordinator: AtmoceCoordinator) -> None:
@@ -77,7 +77,7 @@ class AtmoceGridChargeSwitch(CoordinatorEntity[AtmoceCoordinator], SwitchEntity)
     """Whether the battery may charge from the grid when self-managing."""
 
     _attr_has_entity_name = True
-    _attr_name = "Grid Charging"
+    _attr_translation_key = "grid_charge"
     _attr_icon = "mdi:transmission-tower-import"
 
     def __init__(self, coordinator: AtmoceCoordinator) -> None:
@@ -104,7 +104,7 @@ class AtmoceSellToGridSwitch(CoordinatorEntity[AtmoceCoordinator], SwitchEntity)
     """Whether the battery may export stored energy to the grid."""
 
     _attr_has_entity_name = True
-    _attr_name = "Export To Grid"
+    _attr_translation_key = "sell_to_grid"
     _attr_icon = "mdi:transmission-tower-export"
 
     def __init__(self, coordinator: AtmoceCoordinator) -> None:
@@ -134,11 +134,15 @@ class AtmoceSellToGridSwitch(CoordinatorEntity[AtmoceCoordinator], SwitchEntity)
 class AtmoceNumber(CoordinatorEntity[AtmoceCoordinator], NumberEntity):
     _attr_has_entity_name = True
     _attr_mode = NumberMode.BOX
+    # Every number is a setting rather than a thing the battery is doing, so
+    # they collect under Configuration instead of crowding the main card.
+    _attr_entity_category = EntityCategory.CONFIG
 
-    def __init__(self, coordinator: AtmoceCoordinator, key: str, name: str) -> None:
+    def __init__(self, coordinator: AtmoceCoordinator, key: str) -> None:
         super().__init__(coordinator)
         self._key = key
-        self._attr_name = name
+        # Name comes from `entity.number.<key>` in the translation files.
+        self._attr_translation_key = key
         self._attr_unique_id = f"{coordinator.serial_number}_{key}"
         self._attr_device_info = _device_info(coordinator)
 
@@ -178,7 +182,7 @@ class AtmoceTargetSOC(AtmoceForcedParam):
     _attr_icon = "mdi:battery-arrow-up"
 
     def __init__(self, coordinator: AtmoceCoordinator) -> None:
-        super().__init__(coordinator, "forced_target_soc", "Forced Target SOC")
+        super().__init__(coordinator, "forced_target_soc")
 
 
 class AtmoceForcedDuration(AtmoceForcedParam):
@@ -189,7 +193,7 @@ class AtmoceForcedDuration(AtmoceForcedParam):
     _attr_icon = "mdi:timer-outline"
 
     def __init__(self, coordinator: AtmoceCoordinator) -> None:
-        super().__init__(coordinator, "forced_duration", "Forced Duration")
+        super().__init__(coordinator, "forced_duration")
 
 
 class AtmoceForcedPower(AtmoceForcedParam):
@@ -199,7 +203,7 @@ class AtmoceForcedPower(AtmoceForcedParam):
     _attr_icon = "mdi:flash"
 
     def __init__(self, coordinator: AtmoceCoordinator) -> None:
-        super().__init__(coordinator, "forced_power", "Forced Power")
+        super().__init__(coordinator, "forced_power")
         # Max from battery catalogue
         self._attr_native_max_value = coordinator.max_charge_kw
 
@@ -219,7 +223,7 @@ class AtmoceDispatchPower(AtmoceNumber):
     _attr_icon = "mdi:battery-arrow-down-outline"
 
     def __init__(self, coordinator: AtmoceCoordinator) -> None:
-        super().__init__(coordinator, "battery_dispatch_power", "Dispatch Power")
+        super().__init__(coordinator, "battery_dispatch_power")
         self._attr_native_min_value = -coordinator.max_charge_kw
         self._attr_native_max_value = coordinator.max_discharge_kw
 
@@ -313,7 +317,7 @@ class AtmoceGridChargePower(AtmocePolicyPower):
     _limit_key = KEY_GRID_CHARGE_POWER_MAX
 
     def __init__(self, coordinator: AtmoceCoordinator) -> None:
-        super().__init__(coordinator, KEY_GRID_CHARGE_POWER, "Grid Charge Power")
+        super().__init__(coordinator, KEY_GRID_CHARGE_POWER)
 
 
 class AtmoceGridChargeCutoffSOC(AtmocePolicyNumber):
@@ -327,9 +331,7 @@ class AtmoceGridChargeCutoffSOC(AtmocePolicyNumber):
     _toggle_key = KEY_GRID_CHARGE
 
     def __init__(self, coordinator: AtmoceCoordinator) -> None:
-        super().__init__(
-            coordinator, KEY_GRID_CHARGE_CUTOFF_SOC, "Grid Charge Limit SOC"
-        )
+        super().__init__(coordinator, KEY_GRID_CHARGE_CUTOFF_SOC)
 
 
 class AtmoceSellToGridPower(AtmocePolicyPower):
@@ -340,7 +342,7 @@ class AtmoceSellToGridPower(AtmocePolicyPower):
     _limit_key = KEY_SELL_TO_GRID_POWER_MAX
 
     def __init__(self, coordinator: AtmoceCoordinator) -> None:
-        super().__init__(coordinator, KEY_SELL_TO_GRID_POWER, "Export Power")
+        super().__init__(coordinator, KEY_SELL_TO_GRID_POWER)
 
 
 class AtmoceSellToGridUpSOC(AtmocePolicyNumber):
@@ -354,7 +356,7 @@ class AtmoceSellToGridUpSOC(AtmocePolicyNumber):
     _toggle_key = KEY_SELL_TO_GRID
 
     def __init__(self, coordinator: AtmoceCoordinator) -> None:
-        super().__init__(coordinator, KEY_SELL_TO_GRID_UP_SOC, "Export Above SOC")
+        super().__init__(coordinator, KEY_SELL_TO_GRID_UP_SOC)
 
 
 class AtmoceEndOfChargeSOC(AtmoceWebSOCNumber):
@@ -365,7 +367,7 @@ class AtmoceEndOfChargeSOC(AtmoceWebSOCNumber):
     _attr_icon = "mdi:battery-high"
 
     def __init__(self, coordinator: AtmoceCoordinator) -> None:
-        super().__init__(coordinator, KEY_END_OF_CHARGE_SOC, "Charge Limit SOC")
+        super().__init__(coordinator, KEY_END_OF_CHARGE_SOC)
 
 
 class AtmoceEndOfDischargeSOC(AtmoceWebSOCNumber):
@@ -376,7 +378,7 @@ class AtmoceEndOfDischargeSOC(AtmoceWebSOCNumber):
     _attr_icon = "mdi:battery-low"
 
     def __init__(self, coordinator: AtmoceCoordinator) -> None:
-        super().__init__(coordinator, KEY_END_OF_DISCHARGE_SOC, "Discharge Limit SOC")
+        super().__init__(coordinator, KEY_END_OF_DISCHARGE_SOC)
 
 
 class AtmoceBatteryReservedSOC(AtmoceWebSOCNumber):
@@ -389,7 +391,7 @@ class AtmoceBatteryReservedSOC(AtmoceWebSOCNumber):
     _attr_icon = "mdi:battery-lock"
 
     def __init__(self, coordinator: AtmoceCoordinator) -> None:
-        super().__init__(coordinator, KEY_BATTERY_RESERVED_SOC, "Backup Reserve SOC")
+        super().__init__(coordinator, KEY_BATTERY_RESERVED_SOC)
 
     @property
     def native_min_value(self) -> float:
@@ -410,12 +412,15 @@ class AtmoceForcedCommandSelect(CoordinatorEntity[AtmoceCoordinator], SelectEnti
     """Select forced charge / discharge / auto mode."""
 
     _attr_has_entity_name = True
-    _attr_name = "Battery Command"
+    _attr_translation_key = "battery_command"
     _attr_icon = "mdi:battery-sync"
+    # Options are slugs, not display text: the visible label comes from
+    # `entity.select.battery_command.state` in the translation files, which is
+    # the only way this reads as anything but English.
     _CMD_TO_OPTION: ClassVar[dict[int, str]] = {
-        FORCED_CMD_CHARGE:    "Forced charge",
-        FORCED_CMD_DISCHARGE: "Forced discharge",
-        FORCED_CMD_AUTO:      "Battery managed",
+        FORCED_CMD_CHARGE:    "forced_charge",
+        FORCED_CMD_DISCHARGE: "forced_discharge",
+        FORCED_CMD_AUTO:      "battery_managed",
     }
     _OPTION_TO_CMD: ClassVar[dict[str, int]] = {
         v: k for k, v in _CMD_TO_OPTION.items()
@@ -467,12 +472,12 @@ class AtmoceWorkModeSelect(CoordinatorEntity[AtmoceCoordinator], SelectEntity):
     """
 
     _attr_has_entity_name = True
-    _attr_name = "Self-Managed Mode"
+    _attr_translation_key = "work_mode"
     _attr_icon = "mdi:home-lightning-bolt"
 
     _MODE_TO_OPTION: ClassVar[dict[int, str]] = {
-        WORK_MODE_SELF_POWERED: "Self-powered",
-        WORK_MODE_TOU:          "Time of use",
+        WORK_MODE_SELF_POWERED: "self_powered",
+        WORK_MODE_TOU:          "time_of_use",
     }
     _OPTION_TO_MODE: ClassVar[dict[str, int]] = {
         v: k for k, v in _MODE_TO_OPTION.items()
@@ -503,12 +508,15 @@ class AtmoceForcedModeSelect(CoordinatorEntity[AtmoceCoordinator], SelectEntity)
     """Select how forced mode is measured: SOC, duration, or both."""
 
     _attr_has_entity_name = True
-    _attr_name = "Forced Mode Type"
+    _attr_translation_key = "forced_mode_type"
     _attr_icon = "mdi:tune"
+    # How a forced command is measured — a setting of that command, not a
+    # control in its own right.
+    _attr_entity_category = EntityCategory.CONFIG
     _MODE_TO_OPTION: ClassVar[dict[int, str]] = {
-        FORCED_MODE_SOC:      "Target SOC",
-        FORCED_MODE_DURATION: "Duration",
-        FORCED_MODE_BOTH:     "SOC + Duration",
+        FORCED_MODE_SOC:      "target_soc",
+        FORCED_MODE_DURATION: "duration",
+        FORCED_MODE_BOTH:     "soc_duration",
     }
     _OPTION_TO_MODE: ClassVar[dict[str, int]] = {
         v: k for k, v in _MODE_TO_OPTION.items()
@@ -540,8 +548,10 @@ class AtmoceResetButton(CoordinatorEntity[AtmoceCoordinator], ButtonEntity):
     """Button to reset the Atmoce gateway."""
 
     _attr_has_entity_name = True
-    _attr_name = "Reset Gateway"
+    _attr_translation_key = "reset_gateway"
     _attr_icon = "mdi:restart"
+    # Maintenance, not day-to-day operation.
+    _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(self, coordinator: AtmoceCoordinator) -> None:
         super().__init__(coordinator)

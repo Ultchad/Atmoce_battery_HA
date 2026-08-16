@@ -214,7 +214,7 @@ class TestForcedParamsAreStaged:
             side_effect=lambda v: calls.append("cmd")
         )
 
-        await entity.async_select_option("Forced charge")
+        await entity.async_select_option("forced_charge")
 
         # Control, then the parameters the command reads, then the command.
         assert calls == ["remote", "params", "cmd"]
@@ -225,7 +225,7 @@ class TestForcedParamsAreStaged:
         coord = _make_coordinator({"forced_cmd": FORCED_CMD_CHARGE})
         entity = _make_entity(AtmoceForcedCommandSelect, coord)
 
-        await entity.async_select_option("Battery managed")
+        await entity.async_select_option("battery_managed")
 
         coord.async_apply_staged_params.assert_not_awaited()
 
@@ -265,7 +265,7 @@ class TestPortalPolicy:
     def test_work_mode_reads_back(self):
         coord = self._coord({"work_mode": WORK_MODE_TOU})
         entity = _make_entity(AtmoceWorkModeSelect, coord)
-        assert entity.current_option == "Time of use"
+        assert entity.current_option == "time_of_use"
 
     def test_work_mode_unknown_value_is_none(self):
         """The mapping is inferred, so an unexpected value must not crash."""
@@ -277,7 +277,7 @@ class TestPortalPolicy:
     async def test_selecting_a_mode_writes_the_number(self):
         coord = self._coord({"work_mode": WORK_MODE_SELF_POWERED})
         entity = _make_entity(AtmoceWorkModeSelect, coord)
-        await entity.async_select_option("Time of use")
+        await entity.async_select_option("time_of_use")
         coord.async_set_web_setting.assert_awaited_once_with("work_mode", WORK_MODE_TOU)
 
     @pytest.mark.asyncio
@@ -387,13 +387,13 @@ class TestForcedCommandSelect:
         return entity
 
     def test_current_option_charge(self):
-        assert self._entity(FORCED_CMD_CHARGE).current_option == "Forced charge"
+        assert self._entity(FORCED_CMD_CHARGE).current_option == "forced_charge"
 
     def test_current_option_discharge(self):
-        assert self._entity(FORCED_CMD_DISCHARGE).current_option == "Forced discharge"
+        assert self._entity(FORCED_CMD_DISCHARGE).current_option == "forced_discharge"
 
     def test_current_option_auto(self):
-        assert self._entity(FORCED_CMD_AUTO).current_option == "Battery managed"
+        assert self._entity(FORCED_CMD_AUTO).current_option == "battery_managed"
 
     def test_current_option_none_when_missing(self):
         assert self._entity(None).current_option is None
@@ -412,7 +412,7 @@ class TestForcedCommandSelect:
             side_effect=lambda v: calls.append(("cmd", v))
         )
 
-        await entity.async_select_option("Forced charge")
+        await entity.async_select_option("forced_charge")
 
         # Order matters: the order is discarded if it arrives while still local.
         assert calls == [("remote", True), ("cmd", FORCED_CMD_CHARGE)]
@@ -422,7 +422,7 @@ class TestForcedCommandSelect:
         coord = _make_coordinator({"forced_cmd": FORCED_CMD_AUTO})
         entity = _make_entity(AtmoceForcedCommandSelect, coord)
 
-        await entity.async_select_option("Forced discharge")
+        await entity.async_select_option("forced_discharge")
 
         coord.async_set_remote_control.assert_awaited_once_with(True)
         coord.async_set_forced_command.assert_awaited_once_with(FORCED_CMD_DISCHARGE)
@@ -431,7 +431,7 @@ class TestForcedCommandSelect:
     async def test_select_auto_also_disables_remote(self):
         coord = _make_coordinator({"forced_cmd": FORCED_CMD_CHARGE})
         entity = _make_entity(AtmoceForcedCommandSelect, coord)
-        await entity.async_select_option("Battery managed")
+        await entity.async_select_option("battery_managed")
         coord.async_set_forced_command.assert_awaited_once_with(FORCED_CMD_AUTO)
         coord.async_set_remote_control.assert_awaited_once_with(False)
 
@@ -449,7 +449,7 @@ class TestForcedCommandSelect:
             side_effect=lambda v: calls.append(("cmd", v))
         )
 
-        await entity.async_select_option("Battery managed")
+        await entity.async_select_option("battery_managed")
 
         assert calls == [("cmd", FORCED_CMD_AUTO), ("remote", False)]
 
@@ -461,19 +461,19 @@ class TestForcedModeSelect:
         return entity
 
     def test_current_option_soc(self):
-        assert self._entity(FORCED_MODE_SOC).current_option == "Target SOC"
+        assert self._entity(FORCED_MODE_SOC).current_option == "target_soc"
 
     def test_current_option_duration(self):
-        assert self._entity(FORCED_MODE_DURATION).current_option == "Duration"
+        assert self._entity(FORCED_MODE_DURATION).current_option == "duration"
 
     def test_current_option_both(self):
-        assert self._entity(FORCED_MODE_BOTH).current_option == "SOC + Duration"
+        assert self._entity(FORCED_MODE_BOTH).current_option == "soc_duration"
 
     @pytest.mark.asyncio
     async def test_select_duration(self):
         coord = _make_coordinator({"forced_mode": FORCED_MODE_SOC})
         entity = _make_entity(AtmoceForcedModeSelect, coord)
-        await entity.async_select_option("Duration")
+        await entity.async_select_option("duration")
         coord.async_set_forced_mode.assert_awaited_once_with(FORCED_MODE_DURATION)
 
 
