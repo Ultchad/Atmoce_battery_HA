@@ -16,7 +16,7 @@ Still under testing with the **Atmoce MS-7K-U** (7 kWh LFP battery). Should be c
 ## Features
 
 - **27 sensor entities** — grid, PV, battery, system and computed metrics
-- **Full battery control** — force charge/discharge, set target SOC (Requires cloud user and password for this function), duration and power or just let the battery manage itself. 
+- **Full battery control** — force charge/discharge, set target SOC, duration and power, or just let the battery manage itself. All local over Modbus, no account needed (the separate battery SOC limits further down are the ones that need your atmocecloud.com login)
 - **Battery count** in setup — say how many MS-7K-U units you have and the capacity and power limits follow; changeable later via **Reconfigure**, with manual entry for other hardware
 - **Automatic Modbus→Cloud fallback** (optional) if the gateway is temporarily unreachable, although a very rare case (and requires ATMOCE to hand you API credentials)
 - **Active data source sensor** — always know whether you are reading Modbus or Cloud
@@ -83,6 +83,7 @@ Still under testing with the **Atmoce MS-7K-U** (7 kWh LFP battery). Should be c
 
 | Entity | Description |
 |--------|-------------|
+| `switch.atmoce_remote_control` | Enable/disable remote Modbus control. **Must be ON before setting any of the numbers below** — the battery ignores Modbus writes in local mode. The Battery Command select turns it on and off for you. |
 | `number.atmoce_forced_target_soc` | Target SOC for forced charge/discharge (0–100 %) |
 | `number.atmoce_forced_duration` | Duration for forced operation (0–1440 min) |
 | `number.atmoce_forced_power` | Power for forced charge (0–max charge kW) |
