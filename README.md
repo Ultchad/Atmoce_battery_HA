@@ -228,4 +228,4 @@ This integration is free and always will be. If it saved you an afternoon of rev
 
 ## License
 
-Public domain — see [LICENSE](LICENSE). No rights reserved.
+MIT — see [LICENSE](LICENSE).
