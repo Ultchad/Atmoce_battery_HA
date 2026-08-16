@@ -65,8 +65,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if coordinator.soc_control_available:
         entry.async_create_background_task(
             hass,
-            coordinator.async_load_web_soc_limits(),
-            "atmoce_web_soc_load",
+            coordinator.async_load_web_settings(),
+            "atmoce_web_settings_load",
         )
 
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))

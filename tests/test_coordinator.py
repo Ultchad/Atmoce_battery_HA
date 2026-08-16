@@ -366,7 +366,7 @@ class TestWebSOCLimits:
         })
         _web_enable(coordinator, web)
 
-        await coordinator.async_load_web_soc_limits()
+        await coordinator.async_load_web_settings()
 
         assert coordinator._web_params[KEY_END_OF_CHARGE_SOC] == 90
         assert coordinator._web_params[KEY_END_OF_DISCHARGE_SOC] == 10
@@ -374,7 +374,7 @@ class TestWebSOCLimits:
 
     @pytest.mark.asyncio
     async def test_load_noop_without_web_login(self, coordinator):
-        await coordinator.async_load_web_soc_limits()
+        await coordinator.async_load_web_settings()
         assert coordinator._web_params == {}
 
     @pytest.mark.asyncio
@@ -384,5 +384,5 @@ class TestWebSOCLimits:
         _web_enable(coordinator, web)
 
         # Must not raise — best-effort load.
-        await coordinator.async_load_web_soc_limits()
+        await coordinator.async_load_web_settings()
         assert coordinator._web_params == {}

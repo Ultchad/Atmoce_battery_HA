@@ -135,6 +135,11 @@ KEY_SELL_TO_GRID_POWER_MAX  = "sell_to_grid_max_power_limit"
 WORK_MODE_SELF_POWERED = 1
 WORK_MODE_TOU          = 2
 
+# How often to re-read the portal. Settings can be changed from the ATMOZEN app
+# and nothing tells us when that happens, so it has to be polled — but slowly:
+# this is an undocumented API and the Modbus loop already runs every few seconds.
+WEB_REFRESH_SECONDS = 15 * 60
+
 # ── Forced command option values ─────────────────────────────────────────────
 FORCED_CMD_CHARGE    = 0
 FORCED_CMD_DISCHARGE = 1

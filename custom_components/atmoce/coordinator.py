@@ -58,6 +58,7 @@ from .const import (
     WEB_FIELD_SELL_TO_GRID_POWER_MAX,
     WEB_FIELD_SELL_TO_GRID_UP_SOC,
     WEB_FIELD_WORK_MODEL,
+    WEB_REFRESH_SECONDS,
 )
 from .modbus_client import AtmoceModbusClient
 
@@ -154,6 +155,9 @@ class AtmoceCoordinator(DataUpdateCoordinator):
         self._web_params: dict[str, Any] = {}
         # Last raw storageModel object read from the portal, for diagnostics
         self._web_model: dict[str, Any] = {}
+        # When the portal was last read, and the refresh in flight if any
+        self._web_last_read: float | None = None
+        self._web_refresh_task: asyncio.Task | None = None
         # Forced-mode parameters held in Home Assistant until a forced command
         # applies them. See stage_forced_param for why they are not written
         # straight away.
@@ -234,7 +238,37 @@ class AtmoceCoordinator(DataUpdateCoordinator):
         # otherwise overwrite what the owner just typed with the old register.
         raw.update(self._staged_params)
 
+        self._schedule_web_refresh()
+
         return raw
+
+    def _schedule_web_refresh(self) -> None:
+        """Re-read the portal every WEB_REFRESH_SECONDS, off the polling path.
+
+        The portal settings can be changed from the ATMOZEN app or the website
+        and nothing notifies us, so without this Home Assistant would keep
+        showing whatever it read at startup. Fired as a background task: a slow
+        HTTP round trip has no business blocking a Modbus poll, and a failure
+        there is already logged and swallowed.
+        """
+        if not self.soc_control_available:
+            return
+        if self._web_refresh_task is not None and not self._web_refresh_task.done():
+            return
+
+        now = self.hass.loop.time()
+        if (
+            self._web_last_read is not None
+            and now - self._web_last_read < WEB_REFRESH_SECONDS
+        ):
+            return
+
+        # Stamped before the read, not after, so a failing portal is retried on
+        # the same slow cadence rather than on every poll.
+        self._web_last_read = now
+        self._web_refresh_task = self.hass.async_create_task(
+            self.async_load_web_settings()
+        )
 
     # ── Modbus fetch ──────────────────────────────────────────────────────────
     async def _fetch_modbus(self) -> dict[str, Any]:
@@ -390,7 +424,7 @@ class AtmoceCoordinator(DataUpdateCoordinator):
             )
         return self._station_id
 
-    async def async_load_web_soc_limits(self) -> None:
+    async def async_load_web_settings(self) -> None:
         """Read the battery SOC limits from the web portal and cache them.
 
         Best-effort: called once at setup (and after a write). Failures are logged
