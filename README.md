@@ -83,7 +83,7 @@ Still under testing with the **Atmoce MS-7K-U** (7 kWh LFP battery). Should be c
 
 | Entity | Description |
 |--------|-------------|
-| `switch.atmoce_remote_control` | Enable/disable remote Modbus control. **Must be ON before setting any of the numbers below** — the battery ignores Modbus writes in local mode. The Battery Command select turns it on and off for you. |
+| `switch.atmoce_remote_control` | Enable/disable remote Modbus control — the battery ignores Modbus writes in local mode. You no longer need to turn it on by hand: every control below takes it first, and **Administrado por batería** releases it again. |
 | `number.atmoce_forced_target_soc` | Target SOC for forced charge/discharge (0–100 %) |
 | `number.atmoce_forced_duration` | Duration for forced operation (0–1440 min) |
 | `number.atmoce_forced_power` | Power for forced charge (0–max charge kW) |
@@ -164,7 +164,7 @@ Make sure the gateway (MC100 / MG100) has Modbus TCP enabled on port 502. This i
 Reload the integration from Settings → Devices & Services → Atmoce Battery → ⋮ → Reload. If the problem persists, restart Home Assistant.
 
 **The battery commands have no effect.**
-The battery ignores Modbus writes while in local mode, so `switch.atmoce_remote_control` must be **ON** for any command to land. Picking **Forced charge** or **Forced discharge** in the Battery Command select now takes remote control for you; **Battery managed** releases it again. The number entities — target SOC, duration, forced power, dispatch power — do not, so turn the switch on before setting those.
+The battery ignores Modbus writes while in local mode, so `switch.atmoce_remote_control` must be ON for anything to land. Since v1.3.4 you do not have to think about it: setting any number, or picking **Forced charge** / **Forced discharge**, takes remote control first, and **Administrado por batería** releases it. On older versions, turn the switch on before sending anything — and note that a parameter set while in local mode was discarded, so a forced command issued afterwards ran with whatever value the gateway still held.
 
 **Sensors show "unavailable" after a few hours.**
 The gateway has stopped answering over Modbus. The Cloud fallback covers this, but it needs partner Open API keys (`app_key` / `app_secret`) that do not ship with the hardware — per the Open API manual §3.1.2 the installer requests them by email from Atmoce support. Without them, check the gateway's network connection instead; the fallback cannot be enabled.

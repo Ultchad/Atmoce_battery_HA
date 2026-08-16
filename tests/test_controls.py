@@ -5,6 +5,7 @@ import pytest
 
 from custom_components.atmoce.controls import (
     AtmoceDispatchPower,
+    AtmoceEndOfChargeSOC,
     AtmoceForcedCommandSelect,
     AtmoceForcedDuration,
     AtmoceForcedModeSelect,
@@ -154,6 +155,72 @@ class TestDispatchPower:
         entity._key = "battery_dispatch_power"
         await entity.async_set_native_value(2.5)
         coord.async_set_dispatch_power.assert_awaited_once_with(2500)
+
+
+class TestNumbersTakeRemoteControl:
+    """Modbus writes are discarded in local mode, so every number must take it.
+
+    Without this, setting a parameter with the switch off was dropped silently
+    and the forced command that followed ran with a stale value.
+    """
+
+    @pytest.mark.parametrize(
+        ("entity_cls", "key", "value", "method"),
+        [
+            (AtmoceTargetSOC, "forced_target_soc", 80, "async_set_forced_target_soc"),
+            (AtmoceForcedDuration, "forced_duration", 60, "async_set_forced_duration"),
+            (AtmoceForcedPower, "forced_power", 3.5, "async_set_forced_power"),
+            (
+                AtmoceDispatchPower,
+                "battery_dispatch_power",
+                2.0,
+                "async_set_dispatch_power",
+            ),
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_control_is_taken_before_the_write(
+        self, entity_cls, key, value, method
+    ):
+        coord = _make_coordinator({key: 0, "comm_control_mode": 0})
+        entity = _make_entity(entity_cls, coord)
+        entity._key = key
+
+        calls = []
+        coord.async_set_remote_control = AsyncMock(
+            side_effect=lambda v: calls.append("remote")
+        )
+        setattr(
+            coord, method, AsyncMock(side_effect=lambda v: calls.append("write"))
+        )
+
+        await entity.async_set_native_value(value)
+
+        assert calls == ["remote", "write"]
+
+    @pytest.mark.asyncio
+    async def test_control_is_taken_even_when_already_remote(self):
+        """A stale readback must not skip the handover."""
+        coord = _make_coordinator({"forced_target_soc": 50, "comm_control_mode": 1})
+        entity = _make_entity(AtmoceTargetSOC, coord)
+
+        await entity.async_set_native_value(80)
+
+        coord.async_set_remote_control.assert_awaited_once_with(True)
+
+    @pytest.mark.asyncio
+    async def test_cloud_soc_limits_do_not_touch_remote_control(self):
+        """These go to the web portal — grabbing the gateway would be a no-op
+        write with a real side effect on how the battery behaves."""
+        coord = _make_coordinator({"end_of_charge_soc": 90})
+        coord.async_set_web_soc_limit = AsyncMock()
+        entity = _make_entity(AtmoceEndOfChargeSOC, coord)
+        entity._key = "end_of_charge_soc"
+
+        await entity.async_set_native_value(95)
+
+        coord.async_set_web_soc_limit.assert_awaited_once_with("end_of_charge_soc", 95)
+        coord.async_set_remote_control.assert_not_awaited()
 
 
 # ── Select entities ───────────────────────────────────────────────────────────

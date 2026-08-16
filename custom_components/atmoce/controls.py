@@ -81,6 +81,27 @@ class AtmoceNumber(CoordinatorEntity[AtmoceCoordinator], NumberEntity):
     def native_value(self) -> float | None:
         return self.coordinator.data.get(self._key)
 
+    async def async_set_native_value(self, value: float) -> None:
+        """Take remote control, then write.
+
+        These are Modbus registers, and the gateway discards writes while in
+        local mode. Setting a parameter with the switch off used to be dropped
+        silently, and the forced command that followed then ran with whatever
+        the gateway already held — so the handover lives here, where no
+        subclass can forget it. Subclasses implement _async_write instead.
+
+        The write is unconditional rather than checking the last polled mode:
+        a stale readback would reintroduce exactly the bug this prevents, and
+        writing register 60301 again is harmless.
+        """
+        await self.coordinator.async_set_remote_control(True)
+        await self._async_write(value)
+        await self.coordinator.async_request_refresh()
+
+    async def _async_write(self, value: float) -> None:
+        """Push `value` to the device. Subclasses must implement this."""
+        raise NotImplementedError
+
 
 class AtmoceTargetSOC(AtmoceNumber):
     _attr_native_min_value = 0
@@ -92,9 +113,8 @@ class AtmoceTargetSOC(AtmoceNumber):
     def __init__(self, coordinator: AtmoceCoordinator) -> None:
         super().__init__(coordinator, "forced_target_soc", "Forced Target SOC")
 
-    async def async_set_native_value(self, value: float) -> None:
+    async def _async_write(self, value: float) -> None:
         await self.coordinator.async_set_forced_target_soc(int(value))
-        await self.coordinator.async_request_refresh()
 
 
 class AtmoceForcedDuration(AtmoceNumber):
@@ -107,9 +127,8 @@ class AtmoceForcedDuration(AtmoceNumber):
     def __init__(self, coordinator: AtmoceCoordinator) -> None:
         super().__init__(coordinator, "forced_duration", "Forced Duration")
 
-    async def async_set_native_value(self, value: float) -> None:
+    async def _async_write(self, value: float) -> None:
         await self.coordinator.async_set_forced_duration(int(value))
-        await self.coordinator.async_request_refresh()
 
 
 class AtmoceForcedPower(AtmoceNumber):
@@ -123,9 +142,8 @@ class AtmoceForcedPower(AtmoceNumber):
         # Max from battery catalogue
         self._attr_native_max_value = coordinator.max_charge_kw
 
-    async def async_set_native_value(self, value: float) -> None:
+    async def _async_write(self, value: float) -> None:
         await self.coordinator.async_set_forced_power(round(value, 2))
-        await self.coordinator.async_request_refresh()
 
 
 class AtmoceDispatchPower(AtmoceNumber):
@@ -143,9 +161,8 @@ class AtmoceDispatchPower(AtmoceNumber):
         raw = self.coordinator.data.get("battery_dispatch_power")
         return round(raw / 1000, 2) if raw is not None else None
 
-    async def async_set_native_value(self, value: float) -> None:
+    async def _async_write(self, value: float) -> None:
         await self.coordinator.async_set_dispatch_power(int(value * 1000))
-        await self.coordinator.async_request_refresh()
 
 
 # ── Battery SOC limits (web portal login) ─────────────────────────────────────
@@ -166,6 +183,9 @@ class AtmoceWebSOCNumber(AtmoceNumber):
         return super().available and self.coordinator.soc_control_available
 
     async def async_set_native_value(self, value: float) -> None:
+        # Deliberately bypasses AtmoceNumber's remote-control handover: these
+        # go to the web portal, not to a Modbus register, so taking control of
+        # the gateway would be a pointless write with a real side effect.
         await self.coordinator.async_set_web_soc_limit(self._key, int(value))
 
 
