@@ -120,6 +120,8 @@ class AtmoceCoordinator(DataUpdateCoordinator):
         self._station_id: int | None = None
         # SOC limits, kept across Modbus polls (Modbus can't provide them)
         self._web_params: dict[str, Any] = {}
+        # Last raw storageModel object read from the portal, for diagnostics
+        self._web_model: dict[str, Any] = {}
         # Forced-mode parameters held in Home Assistant until a forced command
         # applies them. See stage_forced_param for why they are not written
         # straight away.
@@ -288,6 +290,11 @@ class AtmoceCoordinator(DataUpdateCoordinator):
             self.async_set_updated_data({**self.data, **self._staged_params})
 
     @property
+    def web_model(self) -> dict[str, Any]:
+        """The last storageModel read from the portal, raw and unfiltered."""
+        return dict(self._web_model)
+
+    @property
     def staged_params(self) -> dict[str, float]:
         """Parameters typed in Home Assistant but not yet on the gateway."""
         return dict(self._staged_params)
@@ -365,6 +372,13 @@ class AtmoceCoordinator(DataUpdateCoordinator):
         except Exception as exc:
             _LOGGER.warning("Could not read battery SOC limits: %s", exc, exc_info=True)
             return
+
+        # Keep the whole object, not just the three fields read below. It also
+        # carries the working mode and the grid charge / export settings, and
+        # changeModel echoes fields back, so knowing what is in there is how we
+        # tell a setting from something we would be wiping. Surfaced through
+        # diagnostics.
+        self._web_model = dict(model)
 
         for key, field in _SOC_WEB_FIELDS.items():
             raw = model.get(field)

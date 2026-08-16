@@ -157,6 +157,56 @@ class TestDiagnosticsRedaction:
         assert result["last_data"]["pv_power"] == 1500
 
 
+class TestStorageModelDump:
+    """The raw portal model is what tells us which settings exist."""
+
+    @pytest.mark.asyncio
+    async def test_model_is_included(self):
+        hass, entry = _make_hass_and_entry({"host": "192.168.1.100"})
+        hass.data[DOMAIN]["test_entry"].web_model = {
+            "workModel": 1,
+            "gridCharge": 0,
+            "storageChargeCutoffSoc": 90,
+        }
+
+        result = await async_get_config_entry_diagnostics(hass, entry)
+
+        assert result["storage_model"]["workModel"] == 1
+        assert result["storage_model"]["gridCharge"] == 0
+
+    @pytest.mark.asyncio
+    async def test_identifying_fields_are_redacted(self):
+        """Diagnostics get attached to public issues."""
+        hass, entry = _make_hass_and_entry({"host": "192.168.1.100"})
+        hass.data[DOMAIN]["test_entry"].web_model = {
+            "workModel": 1,
+            "stationName": "Casa de Pablo",
+            "ownerMail": "me@example.com",
+            "latitude": 40.41,
+            "nested": {"userPhone": "600000000", "gridCharge": 1},
+        }
+
+        result = await async_get_config_entry_diagnostics(hass, entry)
+        model = result["storage_model"]
+
+        assert model["stationName"] == "**REDACTED**"
+        assert model["ownerMail"] == "**REDACTED**"
+        assert model["latitude"] == "**REDACTED**"
+        assert model["nested"]["userPhone"] == "**REDACTED**"
+        # Settings still come through, including inside nested objects.
+        assert model["workModel"] == 1
+        assert model["nested"]["gridCharge"] == 1
+
+    @pytest.mark.asyncio
+    async def test_empty_without_a_portal_login(self):
+        hass, entry = _make_hass_and_entry({"host": "192.168.1.100"})
+        hass.data[DOMAIN]["test_entry"].web_model = {}
+
+        result = await async_get_config_entry_diagnostics(hass, entry)
+
+        assert result["storage_model"] == {}
+
+
 class TestCredentialsStoredOnce:
     """Credentials must live in entry.data only — never a second copy in options."""
 
