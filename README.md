@@ -10,7 +10,7 @@
 
 Full local control and monitoring of **Atmoce solar + battery systems** over **Modbus TCP**, plus the settings that only exist in the Atmoce portal.
 
-Still under testing with the **Atmoce MS-7K-U** (7 kWh LFP battery). Should be compatible with MC100, MC100-T and MG100 gateways. Try it on your installation and please report back so anything broken can be fixed.
+Fully tested and working with the **Atmoce MS-7K-U** (7 kWh LFP battery). Should be compatible with MC100, MC100-T and MG100 gateways. Try it on your installation and please report back so anything broken can be fixed.
 
 ---
 
