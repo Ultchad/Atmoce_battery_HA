@@ -64,12 +64,26 @@ def _gateway_schema(
         }
     )
 
-# ── Step 2: battery model ────────────────────────────────────────────────────
+# ── Step 2: how many batteries ───────────────────────────────────────────────
+# A plain int with a Range renders as a slider, which is a poor fit for "how
+# many batteries do you own" — a typed box is. NumberSelector hands back a
+# float, so coerce it: the count is stored in the config entry and read back as
+# a unit multiplier.
+_COUNT_SELECTOR = vol.All(
+    selector.NumberSelector(
+        selector.NumberSelectorConfig(
+            min=1,
+            max=MAX_BATTERY_COUNT,
+            step=1,
+            mode=selector.NumberSelectorMode.BOX,
+        )
+    ),
+    vol.Coerce(int),
+)
+
 STEP_BATTERY_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_BATTERY_COUNT, default=DEFAULT_BATTERY_COUNT): vol.All(
-            int, vol.Range(min=1, max=MAX_BATTERY_COUNT)
-        ),
+        vol.Required(CONF_BATTERY_COUNT, default=DEFAULT_BATTERY_COUNT): _COUNT_SELECTOR,
         vol.Optional(CONF_MANUAL_SPECS, default=False): bool,
     }
 )
@@ -302,7 +316,7 @@ class AtmoceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(
                     CONF_BATTERY_COUNT,
                     default=_stored_count(entry.data),
-                ): vol.All(int, vol.Range(min=1, max=MAX_BATTERY_COUNT)),
+                ): _COUNT_SELECTOR,
             }
         )
         return self.async_show_form(step_id="reconfigure", data_schema=schema)

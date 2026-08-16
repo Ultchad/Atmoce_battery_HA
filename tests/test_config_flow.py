@@ -194,6 +194,30 @@ class TestBatteryCount:
         assert flow._data[CONF_BATTERY_COUNT] == 2
 
     @pytest.mark.asyncio
+    async def test_count_is_a_typed_box_not_a_slider(self):
+        flow = self._make_flow()
+        await flow.async_step_battery(None)
+
+        _, kwargs = flow.async_show_form.call_args
+        field = next(
+            k for k in kwargs["data_schema"].schema
+            if str(k) == CONF_BATTERY_COUNT
+        )
+        validators = kwargs["data_schema"].schema[field].validators
+        config = validators[0].config
+        assert config["mode"] == "box"
+        assert config["max"] == 16
+
+    @pytest.mark.asyncio
+    async def test_count_from_the_selector_is_stored_as_an_int(self):
+        """NumberSelector returns a float; 2.0 units would be wrong on disk."""
+        from custom_components.atmoce.config_flow import STEP_BATTERY_SCHEMA
+
+        validated = STEP_BATTERY_SCHEMA({CONF_BATTERY_COUNT: 2.0})
+        assert validated[CONF_BATTERY_COUNT] == 2
+        assert isinstance(validated[CONF_BATTERY_COUNT], int)
+
+    @pytest.mark.asyncio
     async def test_no_model_is_asked_for(self):
         """Atmoce ships one unit, so setup asks a count, not a model."""
         flow = self._make_flow()
