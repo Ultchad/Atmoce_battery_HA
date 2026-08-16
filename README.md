@@ -6,6 +6,7 @@
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 [![GitHub release](https://img.shields.io/github/release/pacorola/Atmoce_battery_HA.svg)](https://github.com/pacorola/Atmoce_battery_HA/releases)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-support-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/pacorola)
 
 Full local control and monitoring of **Atmoce solar + battery systems** over **Modbus TCP**, plus the settings that only exist in the Atmoce portal.
 
@@ -218,6 +219,12 @@ It needs a few minutes of readings to average consumption, and it hides when con
 ## Contributing
 
 Pull requests are welcome — no need to open an issue first. Atmoce's Modbus and Cloud API documentation is in the project wiki for reference.
+
+## Support
+
+This integration is free and always will be. If it saved you an afternoon of reverse-engineering Modbus registers, you can say thanks with a coffee.
+
+<a href="https://buymeacoffee.com/pacorola" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="48" width="174"></a>
 
 ## License
 
