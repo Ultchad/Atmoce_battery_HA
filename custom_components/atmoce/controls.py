@@ -25,6 +25,17 @@ from .const import (
     KEY_BATTERY_RESERVED_SOC,
     KEY_END_OF_CHARGE_SOC,
     KEY_END_OF_DISCHARGE_SOC,
+    KEY_GRID_CHARGE,
+    KEY_GRID_CHARGE_CUTOFF_SOC,
+    KEY_GRID_CHARGE_POWER,
+    KEY_GRID_CHARGE_POWER_MAX,
+    KEY_SELL_TO_GRID,
+    KEY_SELL_TO_GRID_POWER,
+    KEY_SELL_TO_GRID_POWER_MAX,
+    KEY_SELL_TO_GRID_UP_SOC,
+    KEY_WORK_MODE,
+    WORK_MODE_SELF_POWERED,
+    WORK_MODE_TOU,
 )
 from .coordinator import AtmoceCoordinator
 from .sensor import _device_info
@@ -60,6 +71,60 @@ class AtmoceRemoteControlSwitch(CoordinatorEntity[AtmoceCoordinator], SwitchEnti
     async def async_turn_off(self, **kwargs: Any) -> None:
         await self.coordinator.async_set_remote_control(False)
         await self.coordinator.async_request_refresh()
+
+
+class AtmoceGridChargeSwitch(CoordinatorEntity[AtmoceCoordinator], SwitchEntity):
+    """Whether the battery may charge from the grid when self-managing."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Grid Charging"
+    _attr_icon = "mdi:transmission-tower-import"
+
+    def __init__(self, coordinator: AtmoceCoordinator) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{coordinator.serial_number}_grid_charge"
+        self._attr_device_info = _device_info(coordinator)
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.coordinator.soc_control_available
+
+    @property
+    def is_on(self) -> bool | None:
+        return self.coordinator.data.get(KEY_GRID_CHARGE)
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        await self.coordinator.async_set_web_setting(KEY_GRID_CHARGE, True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        await self.coordinator.async_set_web_setting(KEY_GRID_CHARGE, False)
+
+
+class AtmoceSellToGridSwitch(CoordinatorEntity[AtmoceCoordinator], SwitchEntity):
+    """Whether the battery may export stored energy to the grid."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Export To Grid"
+    _attr_icon = "mdi:transmission-tower-export"
+
+    def __init__(self, coordinator: AtmoceCoordinator) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{coordinator.serial_number}_sell_to_grid"
+        self._attr_device_info = _device_info(coordinator)
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.coordinator.soc_control_available
+
+    @property
+    def is_on(self) -> bool | None:
+        return self.coordinator.data.get(KEY_SELL_TO_GRID)
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        await self.coordinator.async_set_web_setting(KEY_SELL_TO_GRID, True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        await self.coordinator.async_set_web_setting(KEY_SELL_TO_GRID, False)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -195,6 +260,103 @@ class AtmoceWebSOCNumber(AtmoceNumber):
         await self.coordinator.async_set_web_soc_limit(self._key, int(value))
 
 
+class AtmocePolicyNumber(AtmoceNumber):
+    """A bound on one of the two opt-in behaviours, written to the portal.
+
+    Nested under its switch: with the behaviour off the value has nothing to
+    apply to, so the entity is offered as unavailable rather than inviting a
+    change that does nothing.
+    """
+
+    _toggle_key: str = ""
+
+    @property
+    def available(self) -> bool:
+        return (
+            super().available
+            and self.coordinator.soc_control_available
+            and bool(self.coordinator.data.get(self._toggle_key))
+        )
+
+    async def async_set_native_value(self, value: float) -> None:
+        await self.coordinator.async_set_web_setting(self._key, self._coerce(value))
+
+    def _coerce(self, value: float) -> Any:
+        return int(value)
+
+
+class AtmocePolicyPower(AtmocePolicyNumber):
+    """Power caps come back as floats in watts, with a server-imposed ceiling."""
+
+    _attr_native_min_value = 0
+    _attr_native_step = 100
+    _attr_native_unit_of_measurement = UnitOfPower.WATT
+    _limit_key: str = ""
+
+    @property
+    def native_max_value(self) -> float:
+        # The portal reports a ceiling far above anything the hardware can do,
+        # so fall back on what the batteries are rated for.
+        hardware = self.coordinator.max_charge_kw * 1000
+        limit = self.coordinator.data.get(self._limit_key)
+        return min(float(limit), hardware) if limit else hardware
+
+    def _coerce(self, value: float) -> Any:
+        return float(value)
+
+
+class AtmoceGridChargePower(AtmocePolicyPower):
+    """How fast the battery may pull from the grid."""
+
+    _attr_icon = "mdi:transmission-tower-import"
+    _toggle_key = KEY_GRID_CHARGE
+    _limit_key = KEY_GRID_CHARGE_POWER_MAX
+
+    def __init__(self, coordinator: AtmoceCoordinator) -> None:
+        super().__init__(coordinator, KEY_GRID_CHARGE_POWER, "Grid Charge Power")
+
+
+class AtmoceGridChargeCutoffSOC(AtmocePolicyNumber):
+    """SOC at which grid charging stops."""
+
+    _attr_native_min_value = 0
+    _attr_native_max_value = 100
+    _attr_native_step = 1
+    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_icon = "mdi:battery-charging-100"
+    _toggle_key = KEY_GRID_CHARGE
+
+    def __init__(self, coordinator: AtmoceCoordinator) -> None:
+        super().__init__(
+            coordinator, KEY_GRID_CHARGE_CUTOFF_SOC, "Grid Charge Limit SOC"
+        )
+
+
+class AtmoceSellToGridPower(AtmocePolicyPower):
+    """How fast the battery may export."""
+
+    _attr_icon = "mdi:transmission-tower-export"
+    _toggle_key = KEY_SELL_TO_GRID
+    _limit_key = KEY_SELL_TO_GRID_POWER_MAX
+
+    def __init__(self, coordinator: AtmoceCoordinator) -> None:
+        super().__init__(coordinator, KEY_SELL_TO_GRID_POWER, "Export Power")
+
+
+class AtmoceSellToGridUpSOC(AtmocePolicyNumber):
+    """SOC above which exporting is allowed."""
+
+    _attr_native_min_value = 0
+    _attr_native_max_value = 100
+    _attr_native_step = 1
+    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_icon = "mdi:battery-arrow-up"
+    _toggle_key = KEY_SELL_TO_GRID
+
+    def __init__(self, coordinator: AtmoceCoordinator) -> None:
+        super().__init__(coordinator, KEY_SELL_TO_GRID_UP_SOC, "Export Above SOC")
+
+
 class AtmoceEndOfChargeSOC(AtmoceWebSOCNumber):
     """Charge limit — the SOC at which charging stops (endOfChargeSOC)."""
 
@@ -293,6 +455,48 @@ class AtmoceForcedCommandSelect(CoordinatorEntity[AtmoceCoordinator], SelectEnti
             await self.coordinator.async_set_forced_command(cmd)
 
         await self.coordinator.async_request_refresh()
+
+
+class AtmoceWorkModeSelect(CoordinatorEntity[AtmoceCoordinator], SelectEntity):
+    """The standing policy the battery follows when nobody is commanding it.
+
+    Distinct from Battery Command, which decides whether the battery obeys
+    itself or Home Assistant. This says what "itself" means. The time-of-use
+    schedule behind the TOU option is configured in the Atmoce portal; this
+    only picks which policy is in force.
+    """
+
+    _attr_has_entity_name = True
+    _attr_name = "Self-Managed Mode"
+    _attr_icon = "mdi:home-lightning-bolt"
+
+    _MODE_TO_OPTION: ClassVar[dict[int, str]] = {
+        WORK_MODE_SELF_POWERED: "Self-powered",
+        WORK_MODE_TOU:          "Time of use",
+    }
+    _OPTION_TO_MODE: ClassVar[dict[str, int]] = {
+        v: k for k, v in _MODE_TO_OPTION.items()
+    }
+
+    def __init__(self, coordinator: AtmoceCoordinator) -> None:
+        super().__init__(coordinator)
+        self._attr_options = list(self._MODE_TO_OPTION.values())
+        self._attr_unique_id = f"{coordinator.serial_number}_work_mode"
+        self._attr_device_info = _device_info(coordinator)
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.coordinator.soc_control_available
+
+    @property
+    def current_option(self) -> str | None:
+        raw = self.coordinator.data.get(KEY_WORK_MODE)
+        return self._MODE_TO_OPTION.get(raw) if raw is not None else None
+
+    async def async_select_option(self, option: str) -> None:
+        await self.coordinator.async_set_web_setting(
+            KEY_WORK_MODE, self._OPTION_TO_MODE[option]
+        )
 
 
 class AtmoceForcedModeSelect(CoordinatorEntity[AtmoceCoordinator], SelectEntity):

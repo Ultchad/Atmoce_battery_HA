@@ -104,6 +104,37 @@ END_OF_CHARGE_SOC_MAX    = 100
 END_OF_DISCHARGE_SOC_MIN = 0
 END_OF_DISCHARGE_SOC_MAX = 30
 
+# ── Standing policy, also from the web portal ────────────────────────────────
+# What the battery does when nobody is commanding it — the counterpart to the
+# Modbus forced commands, which are momentary and need remote control. These
+# settings persist in the portal and survive restarts of anything.
+WEB_FIELD_WORK_MODEL             = "workModel"
+WEB_FIELD_GRID_CHARGE            = "gridCharge"
+WEB_FIELD_GRID_CHARGE_POWER      = "gridChargeMaxPower"
+WEB_FIELD_GRID_CHARGE_CUTOFF_SOC = "storageGridChargeCutoffSoc"
+WEB_FIELD_SELL_TO_GRID           = "storageSellToGridStatus"
+WEB_FIELD_SELL_TO_GRID_POWER     = "storageSellToGridMaxPower"
+WEB_FIELD_SELL_TO_GRID_UP_SOC    = "storageSellToGridUpSOC"
+# Server-imposed ceilings for the two power fields, read-only.
+WEB_FIELD_GRID_CHARGE_POWER_MAX  = "gridChargeMaxPowerLimitUp"
+WEB_FIELD_SELL_TO_GRID_POWER_MAX = "storageSellToGridMaxPowerLimitUp"
+
+KEY_WORK_MODE               = "work_mode"
+KEY_GRID_CHARGE             = "grid_charge"
+KEY_GRID_CHARGE_POWER       = "grid_charge_max_power"
+KEY_GRID_CHARGE_CUTOFF_SOC  = "grid_charge_cutoff_soc"
+KEY_SELL_TO_GRID            = "sell_to_grid"
+KEY_SELL_TO_GRID_POWER      = "sell_to_grid_max_power"
+KEY_SELL_TO_GRID_UP_SOC     = "sell_to_grid_up_soc"
+KEY_GRID_CHARGE_POWER_MAX   = "grid_charge_max_power_limit"
+KEY_SELL_TO_GRID_POWER_MAX  = "sell_to_grid_max_power_limit"
+
+# workModel values. Inferred from a station reading 1 while the Modbus
+# battery_mode register also read 1 (self_consumption); TOU is the only other
+# mode the portal offers. Not seen written down in any Atmoce document.
+WORK_MODE_SELF_POWERED = 1
+WORK_MODE_TOU          = 2
+
 # ── Forced command option values ─────────────────────────────────────────────
 FORCED_CMD_CHARGE    = 0
 FORCED_CMD_DISCHARGE = 1

@@ -34,12 +34,30 @@ from .const import (
     KEY_BATTERY_RESERVED_SOC,
     KEY_END_OF_CHARGE_SOC,
     KEY_END_OF_DISCHARGE_SOC,
+    KEY_GRID_CHARGE,
+    KEY_GRID_CHARGE_CUTOFF_SOC,
+    KEY_GRID_CHARGE_POWER,
+    KEY_GRID_CHARGE_POWER_MAX,
+    KEY_SELL_TO_GRID,
+    KEY_SELL_TO_GRID_POWER,
+    KEY_SELL_TO_GRID_POWER_MAX,
+    KEY_SELL_TO_GRID_UP_SOC,
+    KEY_WORK_MODE,
     MODBUS_RETRY_COUNT,
     SOURCE_CLOUD,
     SOURCE_MODBUS,
     WEB_FIELD_BACKUP_SOC,
     WEB_FIELD_CHARGE_CUTOFF_SOC,
     WEB_FIELD_DISCHARGE_CUTOFF_SOC,
+    WEB_FIELD_GRID_CHARGE,
+    WEB_FIELD_GRID_CHARGE_CUTOFF_SOC,
+    WEB_FIELD_GRID_CHARGE_POWER,
+    WEB_FIELD_GRID_CHARGE_POWER_MAX,
+    WEB_FIELD_SELL_TO_GRID,
+    WEB_FIELD_SELL_TO_GRID_POWER,
+    WEB_FIELD_SELL_TO_GRID_POWER_MAX,
+    WEB_FIELD_SELL_TO_GRID_UP_SOC,
+    WEB_FIELD_WORK_MODEL,
 )
 from .modbus_client import AtmoceModbusClient
 
@@ -73,6 +91,20 @@ _SOC_WEB_FIELDS: dict[str, str] = {
     KEY_END_OF_DISCHARGE_SOC: WEB_FIELD_DISCHARGE_CUTOFF_SOC,
     KEY_BATTERY_RESERVED_SOC: WEB_FIELD_BACKUP_SOC,
 }
+
+# The rest of the portal-backed settings: the standing policy and its two
+# opt-in behaviours, each with a power cap and an SOC bound.
+_POLICY_WEB_FIELDS: dict[str, str] = {
+    KEY_WORK_MODE:              WEB_FIELD_WORK_MODEL,
+    KEY_GRID_CHARGE:            WEB_FIELD_GRID_CHARGE,
+    KEY_GRID_CHARGE_POWER:      WEB_FIELD_GRID_CHARGE_POWER,
+    KEY_GRID_CHARGE_CUTOFF_SOC: WEB_FIELD_GRID_CHARGE_CUTOFF_SOC,
+    KEY_SELL_TO_GRID:           WEB_FIELD_SELL_TO_GRID,
+    KEY_SELL_TO_GRID_POWER:     WEB_FIELD_SELL_TO_GRID_POWER,
+    KEY_SELL_TO_GRID_UP_SOC:    WEB_FIELD_SELL_TO_GRID_UP_SOC,
+}
+
+_WEB_FIELDS: dict[str, str] = {**_SOC_WEB_FIELDS, **_POLICY_WEB_FIELDS}
 
 
 class AtmoceCoordinator(DataUpdateCoordinator):
@@ -380,39 +412,64 @@ class AtmoceCoordinator(DataUpdateCoordinator):
         # diagnostics.
         self._web_model = dict(model)
 
-        for key, field in _SOC_WEB_FIELDS.items():
+        for key, field in _WEB_FIELDS.items():
             raw = model.get(field)
-            if raw is not None and raw != "":
-                try:
-                    self._web_params[key] = int(float(raw))
-                except (TypeError, ValueError):
-                    self._web_params[key] = raw
+            if raw is None or raw == "":
+                continue
+            if isinstance(raw, bool):
+                # The two opt-in behaviours come back as real booleans; coercing
+                # them to 0/1 would lose the switch semantics.
+                self._web_params[key] = raw
+                continue
+            try:
+                self._web_params[key] = int(float(raw))
+            except (TypeError, ValueError):
+                self._web_params[key] = raw
 
-        _LOGGER.debug("Loaded battery SOC limits: %s", self._web_params)
+        # Ceilings the server imposes on the two power fields, so the numbers can
+        # bound themselves instead of guessing.
+        for key, field in (
+            (KEY_GRID_CHARGE_POWER_MAX, WEB_FIELD_GRID_CHARGE_POWER_MAX),
+            (KEY_SELL_TO_GRID_POWER_MAX, WEB_FIELD_SELL_TO_GRID_POWER_MAX),
+        ):
+            raw = model.get(field)
+            if raw is not None:
+                try:
+                    self._web_params[key] = float(raw)
+                except (TypeError, ValueError):
+                    pass
+
+        _LOGGER.debug("Loaded portal settings: %s", self._web_params)
 
         # Push the cached limits to entities without triggering a Modbus poll.
         if self.data is not None:
             self.async_set_updated_data({**self.data, **self._web_params})
 
     async def async_set_web_soc_limit(self, key: str, value: int) -> None:
-        """Write a battery SOC limit via the web portal (read-modify-write).
+        """Write a battery SOC limit via the web portal (read-modify-write)."""
+        await self.async_set_web_setting(key, int(value))
+
+    async def async_set_web_setting(self, key: str, value: Any) -> None:
+        """Write any portal-backed setting (read-modify-write).
 
         Requires the web-portal login (email + password). Updates the cached value
         optimistically on success so the entity reflects the change immediately.
+        The value is passed through as given: the portal expects real booleans
+        for the two opt-in behaviours and numbers for everything else.
         """
         if not self.soc_control_available:
             raise HomeAssistantError(
                 "This setting needs your atmocecloud.com login (email + password) "
                 "configured in the integration options (Configure)."
             )
-        field = _SOC_WEB_FIELDS[key]
+        field = _WEB_FIELDS[key]
         try:
             station_id = await self._async_station_id()
-            await self._get_web_client().async_change_model(station_id, {field: int(value)})
+            await self._get_web_client().async_change_model(station_id, {field: value})
         except Exception as exc:
             raise HomeAssistantError(f"Portal write failed for {key}: {exc}") from exc
 
         # Optimistic update; the next load reconciles with the portal.
-        self._web_params[key] = int(value)
+        self._web_params[key] = value
         if self.data is not None:
             self.async_set_updated_data({**self.data, **self._web_params})

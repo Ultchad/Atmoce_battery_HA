@@ -10,9 +10,16 @@ from custom_components.atmoce.controls import (
     AtmoceForcedDuration,
     AtmoceForcedModeSelect,
     AtmoceForcedPower,
+    AtmoceGridChargeCutoffSOC,
+    AtmoceGridChargePower,
+    AtmoceGridChargeSwitch,
     AtmoceRemoteControlSwitch,
     AtmoceResetButton,
+    AtmoceSellToGridPower,
+    AtmoceSellToGridSwitch,
+    AtmoceSellToGridUpSOC,
     AtmoceTargetSOC,
+    AtmoceWorkModeSelect,
 )
 from custom_components.atmoce.const import (
     FORCED_CMD_AUTO,
@@ -21,6 +28,8 @@ from custom_components.atmoce.const import (
     FORCED_MODE_BOTH,
     FORCED_MODE_DURATION,
     FORCED_MODE_SOC,
+    WORK_MODE_SELF_POWERED,
+    WORK_MODE_TOU,
 )
 
 
@@ -242,6 +251,115 @@ class TestDispatchPower:
         await entity.async_set_native_value(2.0)
         coord.async_set_dispatch_power.assert_awaited_once_with(2000)
         coord.async_set_remote_control.assert_not_awaited()
+
+
+class TestPortalPolicy:
+    """The standing policy: what the battery does when nobody commands it."""
+
+    def _coord(self, data):
+        coord = _make_coordinator(data)
+        coord.async_set_web_setting = AsyncMock()
+        coord.soc_control_available = True
+        return coord
+
+    def test_work_mode_reads_back(self):
+        coord = self._coord({"work_mode": WORK_MODE_TOU})
+        entity = _make_entity(AtmoceWorkModeSelect, coord)
+        assert entity.current_option == "Time of use"
+
+    def test_work_mode_unknown_value_is_none(self):
+        """The mapping is inferred, so an unexpected value must not crash."""
+        coord = self._coord({"work_mode": 7})
+        entity = _make_entity(AtmoceWorkModeSelect, coord)
+        assert entity.current_option is None
+
+    @pytest.mark.asyncio
+    async def test_selecting_a_mode_writes_the_number(self):
+        coord = self._coord({"work_mode": WORK_MODE_SELF_POWERED})
+        entity = _make_entity(AtmoceWorkModeSelect, coord)
+        await entity.async_select_option("Time of use")
+        coord.async_set_web_setting.assert_awaited_once_with("work_mode", WORK_MODE_TOU)
+
+    @pytest.mark.asyncio
+    async def test_grid_charge_switch_sends_real_booleans(self):
+        """The portal returns booleans for these; 0/1 would change the type."""
+        coord = self._coord({"grid_charge": False})
+        entity = _make_entity(AtmoceGridChargeSwitch, coord)
+
+        assert entity.is_on is False
+        await entity.async_turn_on()
+        coord.async_set_web_setting.assert_awaited_once_with("grid_charge", True)
+
+    @pytest.mark.asyncio
+    async def test_export_switch_sends_real_booleans(self):
+        coord = self._coord({"sell_to_grid": True})
+        entity = _make_entity(AtmoceSellToGridSwitch, coord)
+
+        assert entity.is_on is True
+        await entity.async_turn_off()
+        coord.async_set_web_setting.assert_awaited_once_with("sell_to_grid", False)
+
+    def test_bounds_are_unavailable_while_their_toggle_is_off(self):
+        coord = self._coord({"grid_charge": False, "sell_to_grid": False})
+
+        for cls, key in (
+            (AtmoceGridChargePower, "grid_charge_max_power"),
+            (AtmoceGridChargeCutoffSOC, "grid_charge_cutoff_soc"),
+            (AtmoceSellToGridPower, "sell_to_grid_max_power"),
+            (AtmoceSellToGridUpSOC, "sell_to_grid_up_soc"),
+        ):
+            entity = _make_entity(cls, coord)
+            entity._key = key
+            assert entity.available is False, cls.__name__
+
+    def test_bounds_become_available_with_their_toggle(self):
+        coord = self._coord({"grid_charge": True, "grid_charge_max_power": 1000.0})
+        entity = _make_entity(AtmoceGridChargePower, coord)
+        entity._key = "grid_charge_max_power"
+        assert entity.available is True
+
+    def test_power_ceiling_falls_back_to_the_hardware(self):
+        """The portal reports 1000000 W, far beyond anything installed."""
+        coord = self._coord({
+            "grid_charge": True,
+            "grid_charge_max_power": 1000.0,
+            "grid_charge_max_power_limit": 1000000.0,
+        })
+        entity = _make_entity(AtmoceGridChargePower, coord)
+        entity._key = "grid_charge_max_power"
+        # max_charge_kw is 3.75 in the fixture
+        assert entity.native_max_value == 3750
+
+    @pytest.mark.asyncio
+    async def test_power_is_written_as_a_float(self):
+        coord = self._coord({"grid_charge": True, "grid_charge_max_power": 1000.0})
+        entity = _make_entity(AtmoceGridChargePower, coord)
+        entity._key = "grid_charge_max_power"
+
+        await entity.async_set_native_value(1500)
+
+        coord.async_set_web_setting.assert_awaited_once_with(
+            "grid_charge_max_power", 1500.0
+        )
+
+    @pytest.mark.asyncio
+    async def test_soc_bound_is_written_as_an_int(self):
+        coord = self._coord({"grid_charge": True, "grid_charge_cutoff_soc": 100})
+        entity = _make_entity(AtmoceGridChargeCutoffSOC, coord)
+        entity._key = "grid_charge_cutoff_soc"
+
+        await entity.async_set_native_value(80.0)
+
+        coord.async_set_web_setting.assert_awaited_once_with(
+            "grid_charge_cutoff_soc", 80
+        )
+
+    def test_everything_hides_without_a_portal_login(self):
+        coord = self._coord({"grid_charge": True, "work_mode": 1})
+        coord.soc_control_available = False
+
+        assert _make_entity(AtmoceWorkModeSelect, coord).available is False
+        assert _make_entity(AtmoceGridChargeSwitch, coord).available is False
 
 
 class TestCloudLimitsAreSeparate:

@@ -11,6 +11,10 @@ from .controls import (
     AtmoceEndOfDischargeSOC,
     AtmoceForcedDuration,
     AtmoceForcedPower,
+    AtmoceGridChargeCutoffSOC,
+    AtmoceGridChargePower,
+    AtmoceSellToGridPower,
+    AtmoceSellToGridUpSOC,
     AtmoceTargetSOC,
 )
 from .coordinator import AtmoceCoordinator
@@ -29,4 +33,9 @@ async def async_setup_entry(
         AtmoceEndOfChargeSOC(coordinator),
         AtmoceEndOfDischargeSOC(coordinator),
         AtmoceBatteryReservedSOC(coordinator),
+        # Bounds for the two opt-in behaviours, each nested under its switch
+        AtmoceGridChargePower(coordinator),
+        AtmoceGridChargeCutoffSOC(coordinator),
+        AtmoceSellToGridPower(coordinator),
+        AtmoceSellToGridUpSOC(coordinator),
     ])
