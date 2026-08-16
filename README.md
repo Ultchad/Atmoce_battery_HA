@@ -7,23 +7,22 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 [![GitHub release](https://img.shields.io/github/release/pacorola/Atmoce_battery_HA.svg)](https://github.com/pacorola/Atmoce_battery_HA/releases)
 
-Full local control and monitoring of **Atmoce solar + battery systems** via **Modbus TCP**, with an optional read-only Cloud API fallback.
+Full local control and monitoring of **Atmoce solar + battery systems** over **Modbus TCP**, plus the settings that only exist in the Atmoce portal.
 
-Still under testing with the **Atmoce MS-7K-U** (7 kWh LFP battery). Should be compatible with MC100, MC100-T and MG100 gateways. Try on your installation and please report so any needed fix can be done.
+Still under testing with the **Atmoce MS-7K-U** (7 kWh LFP battery). Should be compatible with MC100, MC100-T and MG100 gateways. Try it on your installation and please report back so anything broken can be fixed.
 
 ---
 
 ## Features
 
-- **24 sensor entities** — grid, PV, battery, system and computed metrics
-- **Full battery control** — force charge/discharge, set target SOC, duration and power, or just let the battery manage itself. All local over Modbus, no account needed (the separate battery SOC limits further down are the ones that need your atmocecloud.com login)
-- **Battery count** in setup — say how many MS-7K-U units you have and the capacity and power limits follow; changeable later via **Reconfigure**, with manual entry for other hardware
-- **Automatic Modbus→Cloud fallback** (optional) if the gateway is temporarily unreachable, although a very rare case (and requires ATMOCE to hand you API credentials)
-- **Active data source sensor** — always know whether you are reading Modbus or Cloud
-- **Computed sensors** — autonomy hours and PV self-consumption rate
-- **Standing policy from the portal** — self-powered or time-of-use, grid charging and export, each with its own power and SOC bound
-- **Diagnostics support** — exportable debug info with sensitive fields redacted
-- **Trilingual** — English, Spanish and French, entity names and options included
+- **24 sensors and a problem binary sensor** — grid, solar, battery, plus computed autonomy and self-consumption
+- **Battery control over Modbus** — force charge or discharge with a target SOC, a duration, or both. Entirely local; no account needed
+- **Battery limits** — end-of-charge, end-of-discharge and backup reserve, which Modbus does not expose. Needs your ordinary atmocecloud.com login
+- **Standing policy** — self-powered or time-of-use, grid charging and export, each with its own power cap and SOC bound. Also from the portal
+- **Battery count** in setup — say how many units you have and capacity and power limits follow, changeable later via **Reconfigure** without reinstalling
+- **Cloud monitoring fallback** (optional, rarely needed) if the gateway stops answering over Modbus. Requires partner API keys that Atmoce issues to installers
+- **Diagnostics** — full state export with credentials and site identity redacted
+- **Trilingual** — English, Spanish and French, entity names and select options included
 
 ---
 
@@ -39,163 +38,186 @@ Still under testing with the **Atmoce MS-7K-U** (7 kWh LFP battery). Should be c
 ## Setup
 
 1. Go to **Settings → Devices & Services → Add Integration** and search for **Atmoce Battery**.
-2. **Step 1 — Gateway**: enter the local IP address of your gateway (MC100 / MG100). The integration will verify connectivity before continuing.
-3. **Step 2 — Batteries**: enter how many MS-7K-U units you have. Capacity and power limits are worked out from that. Tick **Enter specifications manually** for different hardware. You can change the count later with **Reconfigure**, without removing the integration.
-4. **Step 3 — atmocecloud.com account (optional)**: your normal portal login. Only needed for the battery SOC limits (charge, discharge and backup reserve), which do not exist over Modbus.
-5. **Step 4 — Cloud monitoring fallback (optional, advanced)**: almost nobody needs this — just submit it. It only covers the gateway going unreachable over Modbus, and it needs partner Open API keys that Atmoce support issues to installers on request.
+2. **Gateway** — the local IP of your MC100 / MG100. Connectivity is verified before continuing.
+3. **Batteries** — how many MS-7K-U units are installed. Capacity and power limits follow from that; tick **Enter specifications manually** for different hardware.
+4. **atmocecloud.com account** (optional) — your ordinary portal login, the same one as the ATMOZEN app. Needed for the battery limits and the standing policy. Everything else works without it.
+5. **Cloud monitoring fallback** (optional, advanced) — almost nobody needs this; submit it untouched. See the FAQ on `app_key`.
 
-> **Note**: The Atmoce Gateway must have **Modbus TCP enabled** (port 502, no authentication). This is the default factory setting.
+> The gateway must have **Modbus TCP enabled** on port 502 with no authentication. That is the factory default.
+
+Modbus is polled every **10 seconds**. The portal is re-read every **15 minutes** and after every change, so edits made in the ATMOZEN app show up here too.
 
 ---
 
 ## Entities
 
+**Entity IDs include the device name**, which is `Atmoce` plus your battery model — so with an MS-7K-U they all begin `atmoce_ms_7k_u_`. The tables below spell that out. If your device was renamed, or you set up manual specs, your prefix differs: check **Developer Tools → States** and filter by `atmoce`.
+
+Entities are grouped by category on the device page. The operating controls sit at the top, settings collect under **Configuration**, and connection health under **Diagnostic**.
+
 ### Sensors
 
 | Entity | Unit | Description |
 |--------|------|-------------|
-| `sensor.atmoce_grid_voltage` | V | Grid voltage |
-| `sensor.atmoce_grid_current` | A | Grid current (signed) |
-| `sensor.atmoce_grid_power` | W | Grid active power (positive = import) |
-| `sensor.atmoce_grid_energy_daily` | kWh | Energy imported today |
-| `sensor.atmoce_grid_energy_total` | kWh | Cumulative energy imported |
-| `sensor.atmoce_electricity_sold_daily` | kWh | Energy exported today |
-| `sensor.atmoce_electricity_sold_total` | kWh | Cumulative energy exported |
-| `sensor.atmoce_pv_power` | W | Current solar generation |
-| `sensor.atmoce_pv_energy_daily` | kWh | Solar produced today |
-| `sensor.atmoce_pv_energy_total` | kWh | Cumulative solar produced |
-| `sensor.atmoce_pv_self_consumption_rate` | % | Solar consumed directly (computed) |
-| `sensor.atmoce_battery_soc` | % | State of charge |
-| `sensor.atmoce_battery_power` | W | Charge/discharge power |
-| `sensor.atmoce_battery_status` | — | charging / discharging / idle |
-| `sensor.atmoce_battery_operating_mode` | — | self_consumption / tou / remote_control |
-| `sensor.atmoce_battery_dispatch_power` | W | Dispatch setpoint readback |
-| `sensor.atmoce_battery_charged_daily` | kWh | Charged today |
-| `sensor.atmoce_battery_discharged_daily` | kWh | Discharged today |
-| `sensor.atmoce_battery_charged_total` | kWh | Cumulative charged |
-| `sensor.atmoce_battery_discharged_total` | kWh | Cumulative discharged |
-| `sensor.atmoce_battery_autonomy` | h | Estimated hours of autonomy (computed) |
-| `sensor.atmoce_station_status` | — | normal / fault |
-| `sensor.atmoce_active_data_source` | — | Modbus / Cloud |
-| `sensor.atmoce_connection_errors` | — | Cumulative Modbus failures |
-| `binary_sensor.atmoce_battery_problem` | — | On if the battery looks stuck: charge pinned at zero while the panels are producing |
+| `sensor.atmoce_ms_7k_u_grid_voltage` | V | Grid voltage |
+| `sensor.atmoce_ms_7k_u_grid_current` | A | Grid current (signed) |
+| `sensor.atmoce_ms_7k_u_grid_power` | W | Grid active power (positive = importing) |
+| `sensor.atmoce_ms_7k_u_grid_energy_daily` | kWh | Imported today |
+| `sensor.atmoce_ms_7k_u_grid_energy_total` | kWh | Imported, lifetime |
+| `sensor.atmoce_ms_7k_u_electricity_sold_daily` | kWh | Exported today |
+| `sensor.atmoce_ms_7k_u_electricity_sold_total` | kWh | Exported, lifetime |
+| `sensor.atmoce_ms_7k_u_pv_power` | W | Solar generation now |
+| `sensor.atmoce_ms_7k_u_pv_energy_daily` | kWh | Solar produced today |
+| `sensor.atmoce_ms_7k_u_pv_energy_total` | kWh | Solar produced, lifetime |
+| `sensor.atmoce_ms_7k_u_pv_self_consumption_rate` | % | Solar used on site (computed) |
+| `sensor.atmoce_ms_7k_u_battery_soc` | % | State of charge |
+| `sensor.atmoce_ms_7k_u_battery_power` | W | Signed: negative charges, positive discharges |
+| `sensor.atmoce_ms_7k_u_battery_status` | — | `charging` / `discharging` / `idle` |
+| `sensor.atmoce_ms_7k_u_battery_operating_mode` | — | `self_consumption` / `tou` / `remote_control` |
+| `sensor.atmoce_ms_7k_u_battery_dispatch_power` | W | Dispatch setpoint readback |
+| `sensor.atmoce_ms_7k_u_battery_charged_daily` | kWh | Charged today |
+| `sensor.atmoce_ms_7k_u_battery_discharged_daily` | kWh | Discharged today |
+| `sensor.atmoce_ms_7k_u_battery_charged_total` | kWh | Charged, lifetime |
+| `sensor.atmoce_ms_7k_u_battery_discharged_total` | kWh | Discharged, lifetime |
+| `sensor.atmoce_ms_7k_u_battery_autonomy` | h | Hours left at current draw (computed) |
+| `sensor.atmoce_ms_7k_u_station_status` | — | `normal` / `fault` |
+| `sensor.atmoce_ms_7k_u_active_data_source` | — | `Modbus` / `Cloud` *(diagnostic)* |
+| `sensor.atmoce_ms_7k_u_connection_errors` | — | Cumulative Modbus failures *(diagnostic)* |
+| `binary_sensor.atmoce_ms_7k_u_battery_problem` | — | On if the battery looks stuck: charge pinned at zero while the panels produce *(diagnostic)* |
 
+> The four `_total` counters come from the gateway itself, so they are the ones to feed the Energy dashboard — no Riemann sum over the power sensors needed.
 
-### Controls
+### Battery control (Modbus, local)
 
 | Entity | Description |
 |--------|-------------|
-| `switch.atmoce_remote_control` | Enable/disable remote Modbus control — the battery ignores Modbus writes in local mode. Selecting a forced command turns it on for you, and `battery_managed` turns it back off. Turn it on by hand only to use dispatch power. |
-| `number.atmoce_forced_target_soc` | Target SOC for forced charge/discharge (0–100 %). Set it any time — it is applied when you pick a forced command |
-| `number.atmoce_forced_duration` | Duration for forced operation (0–1440 min). Applied with the forced command |
-| `number.atmoce_forced_power` | Power for forced charge (0–max charge kW). Applied with the forced command |
-| `number.atmoce_dispatch_power` | Dispatch power setpoint in kW (negative = charge). Only available while remote control is on, since the battery follows it only in that mode |
-| `select.atmoce_battery_command` | `forced_charge` / `forced_discharge` / `battery_managed`. Taking a forced option also takes remote control and applies the numbers above; `battery_managed` hands control back |
-| `select.atmoce_forced_mode_type` | `target_soc` / `duration` / `soc_duration` |
-| `select.atmoce_work_mode` | `self_powered` / `time_of_use` — what the battery does on its own. Needs the atmocecloud.com login. TOU schedules are configured in the Atmoce portal |
-| `switch.atmoce_grid_charge` | Allow charging from the grid while self-managing. Needs the atmocecloud.com login |
-| `switch.atmoce_sell_to_grid` | Allow exporting stored energy. Needs the atmocecloud.com login |
-| `number.atmoce_grid_charge_max_power` | Grid charge power cap (W). Available while grid charging is on |
-| `number.atmoce_grid_charge_cutoff_soc` | Charge from the grid up to this SOC |
-| `number.atmoce_sell_to_grid_max_power` | Export power cap (W). Available while export is on |
-| `number.atmoce_sell_to_grid_up_soc` | Export only above this SOC |
-| `button.atmoce_reset_gateway` | Restart the Atmoce gateway |
+| `select.atmoce_ms_7k_u_battery_command` | `forced_charge` / `forced_discharge` / `battery_managed`. Picking a forced option takes remote control and applies the parameters below; `battery_managed` exits forced mode and hands control back |
+| `switch.atmoce_ms_7k_u_remote_control` | Whether the battery obeys Modbus at all. The command select turns it on and off for you; set it by hand only to use dispatch power |
+| `number.atmoce_ms_7k_u_forced_target_soc` | Charge or discharge until this SOC *(config)* |
+| `number.atmoce_ms_7k_u_forced_duration` | Run for this many minutes, 0–1440 *(config)* |
+| `number.atmoce_ms_7k_u_forced_power` | Power to force with, up to the battery rating *(config)* |
+| `select.atmoce_ms_7k_u_forced_mode_type` | `target_soc` / `duration` / `soc_duration` — which of the two above applies *(config)* |
+| `number.atmoce_ms_7k_u_dispatch_power` | Direct power setpoint in kW, negative to charge. Only available while remote control is on, since that is the only mode the battery follows it in *(config)* |
+| `button.atmoce_ms_7k_u_reset_gateway` | Restart the gateway *(config)* |
 
-> Select **option values are slugs**, not display text — the label you see is translated per language. Automations must use the slug, e.g. `option: "forced_charge"`.
+The three forced parameters are **arguments to the command, not controls of their own**. Setting one changes nothing on the battery: the value waits in Home Assistant and is written when you pick a forced command. So the order does not matter, and adjusting one never pulls a self-managing battery out of its mode.
 
-### Battery SOC limits (Atmoce Cloud login)
+### Battery limits and standing policy (atmocecloud.com login)
 
-These match the charge / discharge / safety-reserve limits editable in the ATMOZEN app. They are **not exposed over Modbus** (the Modbus protocol only offers read-only power limits and no reserve register), so they are read and written through the **same private web-portal API the app uses**, signed in with your **normal atmocecloud.com login (email + password)** — no partner API keys required. Enter your login in **Settings → Devices & Services → Atmoce Battery → Configure**. The portal is re-read every 15 minutes and after each change, so edits made in the ATMOZEN app show up here too. If no login is configured, these entities stay unavailable and everything else (local Modbus) works normally.
+Not available over Modbus — the protocol exposes read-only power limits and no reserve register. These are read and written through the **same private portal API the ATMOZEN app uses**, signed in with your **ordinary email and password**; no partner API keys. Enter the login under **Settings → Devices & Services → Atmoce Battery → Configure**. Without it these entities stay unavailable and the rest works normally.
 
 | Entity | Portal field | Description |
 |--------|--------------|-------------|
-| `number.atmoce_charge_limit_soc` | `storageChargeCutoffSoc` | SOC at which charging stops (80–100 %) |
-| `number.atmoce_discharge_limit_soc` | `storageDischargeCutoffSoc` | SOC at which discharging stops (0–30 %) |
-| `number.atmoce_backup_reserve_soc` | `backupSoc` | Reserve kept for backup — the battery stops discharging here except during a grid outage (range between the two limits above) |
+| `number.atmoce_ms_7k_u_charge_limit_soc` | `storageChargeCutoffSoc` | Charging stops here (80–100 %) |
+| `number.atmoce_ms_7k_u_discharge_limit_soc` | `storageDischargeCutoffSoc` | Discharging stops here (0–30 %) |
+| `number.atmoce_ms_7k_u_backup_reserve_soc` | `backupSoc` | Kept back for outages; the battery stops here except on grid failure |
+| `select.atmoce_ms_7k_u_self_managed_mode` | `workModel` | `self_powered` / `time_of_use` — what the battery does when left alone |
+| `switch.atmoce_ms_7k_u_grid_charging` | `gridCharge` | Allow charging from the grid |
+| `number.atmoce_ms_7k_u_grid_charge_power` | `gridChargeMaxPower` | Grid charge power cap, in watts |
+| `number.atmoce_ms_7k_u_grid_charge_limit_soc` | `storageGridChargeCutoffSoc` | Charge from the grid up to this SOC |
+| `switch.atmoce_ms_7k_u_export_to_grid` | `storageSellToGridStatus` | Allow exporting stored energy |
+| `number.atmoce_ms_7k_u_export_power` | `storageSellToGridMaxPower` | Export power cap, in watts |
+| `number.atmoce_ms_7k_u_export_above_soc` | `storageSellToGridUpSOC` | Export only above this SOC |
 
-> This uses an unofficial API and may change if Atmoce updates their portal.
+The four bounds are nested under their switch: with the behaviour off they show as unavailable, since there is nothing for them to apply to.
+
+**Time-of-use schedules are not editable from here** — configure the time bands in the Atmoce portal. The select only chooses which policy is in force, and switching to `time_of_use` without any band configured leaves the battery in a mode with no schedule.
+
+> This is an unofficial API and may change if Atmoce updates their portal.
+
+### Select options are slugs
+
+The value of a select is a slug; the label you see is translated. Automations must use the slug — `option: "forced_charge"`, not the visible text.
+
+| Select | Values |
+|--------|--------|
+| `battery_command` | `forced_charge`, `forced_discharge`, `battery_managed` |
+| `forced_mode_type` | `target_soc`, `duration`, `soc_duration` |
+| `self_managed_mode` | `self_powered`, `time_of_use` |
 
 ---
 
-## Example automation — charge to 80 % at cheap-rate hours
+## Example automation — charge to 80 % on the night rate
 
 ```yaml
 automation:
   - alias: "Atmoce — Force charge at night rate"
-    trigger:
-      - platform: time
+    triggers:
+      - trigger: time
         at: "01:00:00"
-    action:
-      # No need to turn on remote control or to order these steps carefully:
-      # the numbers are held in Home Assistant and the Battery Command applies
-      # them, after taking remote control, when it starts the forced charge.
-      - service: number.set_value
+    actions:
+      # No need to touch remote control, and no need to order these carefully:
+      # the numbers wait in Home Assistant, and the command applies them after
+      # taking control.
+      - action: number.set_value
         target:
-          entity_id: number.atmoce_forced_target_soc
+          entity_id: number.atmoce_ms_7k_u_forced_target_soc
         data:
           value: 80
-      - service: number.set_value
+      - action: number.set_value
         target:
-          entity_id: number.atmoce_forced_power
+          entity_id: number.atmoce_ms_7k_u_forced_power
         data:
           value: 3.5
-      - service: select.select_option
+      - action: select.select_option
         target:
-          entity_id: select.atmoce_forced_mode_type
+          entity_id: select.atmoce_ms_7k_u_forced_mode_type
         data:
           option: "target_soc"
-      - service: select.select_option
+      - action: select.select_option
         target:
-          entity_id: select.atmoce_battery_command
+          entity_id: select.atmoce_ms_7k_u_battery_command
         data:
           option: "forced_charge"
 
-  - alias: "Atmoce — Return to auto when SOC reached"
-    trigger:
-      - platform: numeric_state
-        entity_id: sensor.atmoce_battery_soc
+  - alias: "Atmoce — Back to automatic once charged"
+    triggers:
+      - trigger: numeric_state
+        entity_id: sensor.atmoce_ms_7k_u_battery_soc
         above: 80
-    action:
-      - service: select.select_option
+    actions:
+      - action: select.select_option
         target:
-          entity_id: select.atmoce_battery_command
+          entity_id: select.atmoce_ms_7k_u_battery_command
         data:
           option: "battery_managed"
 ```
+
+A standing policy is often the better tool: **grid charging with a cutoff SOC** survives a Home Assistant restart and needs no automation at all.
 
 ---
 
 ## FAQ
 
-**The integration fails to connect during setup.**
-Make sure the gateway (MC100 / MG100) has Modbus TCP enabled on port 502. This is the default factory setting. If you changed the port, enter it in the setup wizard.
+**Setup cannot connect to the gateway.**
+Check that Modbus TCP is enabled on port 502 — the factory default. If you changed the port, enter it in the wizard.
 
-**Buttons / controls don't appear in Home Assistant.**
-Reload the integration from Settings → Devices & Services → Atmoce Battery → ⋮ → Reload. If the problem persists, restart Home Assistant.
+**My entity IDs do not match the tables above.**
+They are built from the device name, which includes your battery model. Filter by `atmoce` in **Developer Tools → States** to see yours.
 
-**The battery commands have no effect.**
-The battery ignores Modbus writes while in local mode, so `switch.atmoce_remote_control` must be ON for anything to land. Since v1.3.5 this is handled for you: target SOC, duration and forced power are held in Home Assistant and written when you pick `forced_charge` or `forced_discharge`, which takes remote control first. Set them in any order, before or after; adjusting one never disturbs a self-managing battery. On older versions, turn the switch on by hand before sending anything.
+**A battery command does nothing.**
+The battery ignores Modbus writes in local mode. Since v1.3.5 this is handled for you: picking a forced command takes remote control first. On older versions turn `switch.…_remote_control` on by hand before sending anything.
 
-**I set a target SOC but the battery kept doing its own thing.**
-That is intended. The three forced-mode parameters do nothing on their own — they describe *how* a forced charge or discharge should run. Nothing happens until you select one in `select.atmoce_battery_command`.
+**I set a target SOC and nothing happened.**
+That is intended — it is a parameter, not a command. Pick a forced option in `select.…_battery_command` to apply it.
 
-**Sensors show "unavailable" after a few hours.**
-The gateway has stopped answering over Modbus. The Cloud fallback covers this, but it needs partner Open API keys (`app_key` / `app_secret`) that do not ship with the hardware — per the Open API manual §3.1.2 the installer requests them by email from Atmoce support. Without them, check the gateway's network connection instead; the fallback cannot be enabled.
+**I added a second battery.**
+Use **⋮ → Reconfigure** on the integration and change the count. Capacity and power limits are recalculated; entity history is kept.
 
-**Where do I get the app_key and app_secret?**
-You almost certainly do not need them: the battery SOC limits use your ordinary atmocecloud.com login, not these. They exist only for the Cloud monitoring fallback, are meant for installers managing several sites, and are issued by Atmoce support on request. There is no self-service page that generates them.
+**Where do I get `app_key` and `app_secret`?**
+You almost certainly do not need them — the battery limits use your ordinary portal login. These are partner Open API credentials for the monitoring fallback, meant for installers managing several sites, and per the Open API manual §3.1.2 they are requested by email from Atmoce support. No page generates them.
 
-**How do I know if data is coming from Modbus or Cloud?**
-Check `sensor.atmoce_active_data_source` — it shows `Modbus` or `Cloud`.
+**Sensors go unavailable after a while.**
+The gateway has stopped answering over Modbus. Check its network connection; `sensor.…_connection_errors` counts the failures and `sensor.…_active_data_source` tells you what is being read.
 
-**Autonomy hours sensor is unavailable.**
-The sensor needs at least a few minutes of data to calculate a rolling average consumption. It will appear automatically after the first valid readings.
+**Autonomy is unavailable.**
+It needs a few minutes of readings to average consumption, and it hides when consumption is negligible.
 
 ---
 
 ## Contributing
 
-Pull requests are welcome. No need to open an issue first — just submit the PR. ATMOCE technical documentation on Cloud API and MODBUS protocol are uploaded in the project wiki for reference.
+Pull requests are welcome — no need to open an issue first. Atmoce's Modbus and Cloud API documentation is in the project wiki for reference.
 
 ## License
 

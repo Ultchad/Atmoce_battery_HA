@@ -120,137 +120,137 @@
   "entity": {
     "sensor": {
       "grid_voltage": {
-        "name": "Grid voltage"
+        "name": "Grid Voltage"
       },
       "grid_current": {
-        "name": "Grid current"
+        "name": "Grid Current"
       },
       "grid_power": {
-        "name": "Grid power"
+        "name": "Grid Power"
       },
       "grid_energy_daily": {
-        "name": "Grid energy today"
+        "name": "Grid Energy Daily"
       },
       "grid_energy_total": {
-        "name": "Grid energy total"
+        "name": "Grid Energy Total"
       },
       "elec_sales_daily": {
-        "name": "Electricity sold today"
+        "name": "Electricity Sold Daily"
       },
       "elec_sales_total": {
-        "name": "Electricity sold total"
+        "name": "Electricity Sold Total"
       },
       "pv_power": {
-        "name": "Solar power"
+        "name": "PV Power"
       },
       "pv_energy_daily": {
-        "name": "Solar energy today"
+        "name": "PV Energy Daily"
       },
       "pv_energy_total": {
-        "name": "Solar energy total"
+        "name": "PV Energy Total"
       },
       "pv_self_consumption_rate": {
-        "name": "Solar self-consumption"
+        "name": "PV Self Consumption Rate"
       },
       "battery_soc": {
-        "name": "Battery charge"
+        "name": "Battery SOC"
       },
       "battery_power": {
-        "name": "Battery power"
+        "name": "Battery Power"
       },
       "battery_status": {
-        "name": "Battery status"
+        "name": "Battery Status"
       },
       "battery_mode": {
-        "name": "Operating mode"
+        "name": "Battery Operating Mode"
       },
       "battery_dispatch_power": {
-        "name": "Dispatch power readback"
+        "name": "Battery Dispatch Power"
       },
       "battery_charged_daily": {
-        "name": "Battery charged today"
+        "name": "Battery Charged Daily"
       },
       "battery_discharged_daily": {
-        "name": "Battery discharged today"
+        "name": "Battery Discharged Daily"
       },
       "battery_charged_total": {
-        "name": "Battery charged total"
+        "name": "Battery Charged Total"
       },
       "battery_discharged_total": {
-        "name": "Battery discharged total"
+        "name": "Battery Discharged Total"
       },
       "autonomy_hours": {
-        "name": "Autonomy"
+        "name": "Battery Autonomy"
       },
       "station_status": {
-        "name": "Station status"
+        "name": "Station Status"
       },
       "active_source": {
-        "name": "Active data source"
+        "name": "Active Data Source"
       },
       "connection_errors": {
-        "name": "Connection errors"
+        "name": "Connection Errors"
       }
     },
     "binary_sensor": {
       "battery_problem": {
-        "name": "Battery problem"
+        "name": "Battery Problem"
       }
     },
     "switch": {
       "remote_control": {
-        "name": "Remote control"
+        "name": "Remote Control"
       },
       "grid_charge": {
-        "name": "Grid charging"
+        "name": "Grid Charging"
       },
       "sell_to_grid": {
-        "name": "Export to grid"
+        "name": "Export To Grid"
       }
     },
     "number": {
       "forced_target_soc": {
-        "name": "Forced target charge"
+        "name": "Forced Target SOC"
       },
       "forced_duration": {
-        "name": "Forced duration"
+        "name": "Forced Duration"
       },
       "forced_power": {
-        "name": "Forced power"
+        "name": "Forced Power"
       },
       "battery_dispatch_power": {
-        "name": "Dispatch power"
+        "name": "Dispatch Power"
       },
       "end_of_charge_soc": {
-        "name": "Charge limit"
+        "name": "Charge Limit SOC"
       },
       "end_of_discharge_soc": {
-        "name": "Discharge limit"
+        "name": "Discharge Limit SOC"
       },
       "battery_reserved_soc": {
-        "name": "Backup reserve"
+        "name": "Backup Reserve SOC"
       },
       "grid_charge_max_power": {
-        "name": "Grid charge power"
+        "name": "Grid Charge Power"
       },
       "grid_charge_cutoff_soc": {
-        "name": "Grid charge limit"
+        "name": "Grid Charge Limit SOC"
       },
       "sell_to_grid_max_power": {
-        "name": "Export power"
+        "name": "Export Power"
       },
       "sell_to_grid_up_soc": {
-        "name": "Export above charge"
+        "name": "Export Above SOC"
       }
     },
     "button": {
       "reset_gateway": {
-        "name": "Restart gateway"
+        "name": "Reset Gateway"
       }
     },
     "select": {
       "battery_command": {
-        "name": "Battery command",
+        "name": "Battery Command",
         "state": {
           "forced_charge": "Forced charge",
           "forced_discharge": "Forced discharge",
@@ -258,7 +258,7 @@
         }
       },
       "forced_mode_type": {
-        "name": "Forced mode type",
+        "name": "Forced Mode Type",
         "state": {
           "target_soc": "Target charge",
           "duration": "Duration",
@@ -266,7 +266,7 @@
         }
       },
       "work_mode": {
-        "name": "Self-managed mode",
+        "name": "Self-Managed Mode",
         "state": {
           "self_powered": "Self-powered",
           "time_of_use": "Time of use"
