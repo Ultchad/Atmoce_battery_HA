@@ -125,7 +125,7 @@ STEP_FALLBACK_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_CLOUD_ENABLED, default=False): bool,
         vol.Optional(CONF_CLOUD_APP_KEY, default=""): str,
-        vol.Optional(CONF_CLOUD_APP_SECRET, default=""): str,
+        vol.Optional(CONF_CLOUD_APP_SECRET, default=""): _PASSWORD_SELECTOR,
         vol.Optional(CONF_RETRY_COUNT, default=MODBUS_RETRY_COUNT): vol.All(
             int, vol.Range(min=1, max=20)
         ),
@@ -425,7 +425,7 @@ class AtmoceOptionsFlow(config_entries.OptionsFlow):
                 vol.Optional(
                     CONF_CLOUD_APP_SECRET,
                     default=current.get(CONF_CLOUD_APP_SECRET, ""),
-                ): str,
+                ): _PASSWORD_SELECTOR,
                 vol.Optional(
                     CONF_CLOUD_WEB_EMAIL,
                     default=current.get(CONF_CLOUD_WEB_EMAIL, ""),
